@@ -54,3 +54,5 @@ ci-py313 = ["tests", "ci-py313"]
 dev = ["ci-py313", "dev"]
 
 [tool.pixi.tasks]
+rust-fmt = "cargo fmt"
+rust-lint = "cargo clippy"
