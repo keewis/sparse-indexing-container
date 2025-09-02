@@ -1,0 +1,36 @@
+[build-system]
+requires = ["maturin>=1.8,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "sparse-indexing-container"
+requires-python = ">=3.11"
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+]
+dependencies = ["numpy>=2"]
+dynamic = ["version"]
+
+[tool.maturin]
+python-source = "python"
+features = ["pyo3/extension-module"]
+
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[tool.pixi.pypi-dependencies]
+sparse-indexing-container = { path = ".", editable = true }
+
+[tool.pixi.environments]
+default = { solve-group = "default" }
+tests = { features = ["tests"], solve-group = "default" }
+
+[tool.pixi.tasks]
+
+[tool.pixi.dependencies]
+rust = ">=1.89.0"
+maturin = ">=1.9.4"
+numpy = ">=2.3"
