@@ -1,6 +1,7 @@
 use pyo3::prelude::*;
 
 mod container;
+mod errors;
 
 /// Formats the sum of two numbers as string.
 #[pyfunction]
