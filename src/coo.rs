@@ -52,6 +52,25 @@ mod test {
     use super::*;
     use ndarray::array;
 
+    fn create_coo_2d_f64() -> COO<f64> {
+        let shape: Vec<u64> = vec![10, 10];
+        let data: Array1<f64> = array![1.3, 4.7, 2.6];
+        let coords: Vec<Array1<u64>> = vec![array![2, 7, 4], array![4, 0, 9]];
+        let fill_value: f64 = 0.0;
+
+        COO::new(shape, data, coords, fill_value)
+    }
+
+    fn create_coo_3d_f64() -> COO<f64> {
+        let shape: Vec<u64> = vec![10, 10, 15];
+        let data: Array1<f64> = array![1.3, 4.7, 2.6, 1.2];
+        let coords: Vec<Array1<u64>> =
+            vec![array![2, 7, 4, 9], array![4, 0, 9, 2], array![2, 14, 5, 8]];
+        let fill_value: f64 = 0.0;
+
+        COO::new(shape, data, coords, fill_value)
+    }
+
     #[test]
     fn test_init() {
         let shape: Vec<u64> = vec![10, 10];
@@ -74,19 +93,16 @@ mod test {
     }
 
     #[test]
-    fn test_ndim() {
-        let shape: Vec<u64> = vec![10, 10];
-        let data: Array1<f64> = array![1.3, 4.7, 2.6];
-        let coords: Vec<Array1<u64>> = vec![array![2, 7, 4], array![4, 0, 9]];
-        let fill_value: f64 = 0.0;
-
-        let obj = COO::new(
-            shape.clone(),
-            data.clone(),
-            coords.clone(),
-            fill_value.clone(),
-        );
+    fn test_ndim_2d() {
+        let obj = create_coo_2d_f64();
 
         assert_eq!(obj.ndim(), 2);
+    }
+
+    #[test]
+    fn test_ndim_3d() {
+        let obj = create_coo_3d_f64();
+
+        assert_eq!(obj.ndim(), 3);
     }
 }
