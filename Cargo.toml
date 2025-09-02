@@ -9,4 +9,5 @@ name = "sparse_indexing_container"
 crate-type = ["cdylib"]
 
 [dependencies]
+ndarray = { version = "0.16.1", features = ["rayon"] }
 pyo3 = "0.23.3"
