@@ -1,0 +1,20 @@
+ci:
+  skip:
+    - cargo-clippy
+
+repos:
+  - repo: https://github.com/keewis/rust-pre-commit
+    rev: v0.2.0
+    hooks:
+      - id: rust-fmt
+
+  - repo: local
+    hooks:
+      - id: cargo-clippy
+        name: cargo clippy
+        language: system
+        types: [file]
+        types_or: [rust]
+        entry: pixi run cargo clippy
+        args: ["--all-features", "--all-targets"]
+        pass_filenames: false
