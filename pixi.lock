@@ -1122,7 +1122,7 @@ packages:
 - pypi: ./
   name: sparse-indexing-container
   version: 0.1.0
-  sha256: 4f0c77eabc24adc9e48a391b200b8db5fa9b76ccf701f9624051e41a5c7e21b7
+  sha256: c4d779b45b770225481234cc130714c1e202127e43b1f5abe75bad5a40b49b19
   requires_dist:
   - numpy>=2
   requires_python: '>=3.11'

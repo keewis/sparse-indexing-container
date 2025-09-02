@@ -37,6 +37,9 @@ pytest = "*"
 pytest-xdist = "*"
 pytest-cov = "*"
 
+[tool.pixi.feature.tests.tasks]
+tests = "pytest"
+
 [tool.pixi.feature.ci-py313.dependencies]
 python = "3.13.*"
 
