@@ -1,18 +1,18 @@
 use crate::container::SparseContainer;
 use crate::errors::IndexError;
-use ndarray::{Array1, IxDyn, SliceArg};
+use ndarray::{Array1, Array2, IxDyn, SliceArg, SliceInfoElem, Zip};
 
 #[derive(Debug)]
 struct COO<T> {
     data: Array1<T>,
-    coords: Vec<Array1<u64>>,
+    coords: Array2<usize>,
 
     fill_value: T,
-    shape: Vec<u64>,
+    shape: Vec<usize>,
 }
 
 impl<T> COO<T> {
-    fn new(shape: Vec<u64>, data: Array1<T>, coords: Vec<Array1<u64>>, fill_value: T) -> Self {
+    fn new(shape: Vec<usize>, data: Array1<T>, coords: Array2<usize>, fill_value: T) -> Self {
         // unchecked consistency for increased efficiency
 
         COO {
@@ -25,7 +25,7 @@ impl<T> COO<T> {
 }
 
 impl<T> SparseContainer<T> for COO<T> {
-    fn shape(&self) -> &Vec<u64> {
+    fn shape(&self) -> &Vec<usize> {
         &self.shape
     }
     fn fill_value(&self) -> &T {
@@ -35,7 +35,7 @@ impl<T> SparseContainer<T> for COO<T> {
         &self.data
     }
 
-    fn coords(&self) -> &Vec<Array1<u64>> {
+    fn coords(&self) -> &Array2<usize> {
         &self.coords
     }
 
@@ -53,19 +53,18 @@ mod test {
     use ndarray::array;
 
     fn create_coo_2d_f64() -> COO<f64> {
-        let shape: Vec<u64> = vec![10, 10];
+        let shape: Vec<usize> = vec![10, 10];
         let data: Array1<f64> = array![1.3, 4.7, 2.6];
-        let coords: Vec<Array1<u64>> = vec![array![2, 7, 4], array![4, 0, 9]];
+        let coords: Array2<usize> = array![[2, 4], [7, 0], [4, 9]];
         let fill_value: f64 = 0.0;
 
         COO::new(shape, data, coords, fill_value)
     }
 
     fn create_coo_3d_f64() -> COO<f64> {
-        let shape: Vec<u64> = vec![10, 10, 15];
+        let shape: Vec<usize> = vec![10, 10, 15];
         let data: Array1<f64> = array![1.3, 4.7, 2.6, 1.2];
-        let coords: Vec<Array1<u64>> =
-            vec![array![2, 7, 4, 9], array![4, 0, 9, 2], array![2, 14, 5, 8]];
+        let coords: Array2<usize> = array![[2, 4, 2], [7, 0, 14], [4, 9, 5], [9, 2, 8]];
         let fill_value: f64 = 0.0;
 
         COO::new(shape, data, coords, fill_value)
@@ -73,9 +72,9 @@ mod test {
 
     #[test]
     fn test_init() {
-        let shape: Vec<u64> = vec![10, 10];
+        let shape: Vec<usize> = vec![10, 10];
         let data: Array1<f64> = array![1.3, 4.7, 2.6];
-        let coords: Vec<Array1<u64>> = vec![array![2, 7, 4], array![4, 0, 9]];
+        let coords: Array2<usize> = array![[2, 4], [7, 0], [4, 9]];
         let fill_value: f64 = 0.0;
 
         let obj = COO::new(

@@ -1,12 +1,12 @@
 use crate::errors::IndexError;
-use ndarray::{Array1, IxDyn, SliceArg};
+use ndarray::{Array1, Array2, IxDyn, SliceArg};
 
 pub trait SparseContainer<T> {
     fn fill_value(&self) -> &T;
-    fn shape(&self) -> &Vec<u64>;
+    fn shape(&self) -> &Vec<usize>;
 
     fn data(&self) -> &Array1<T>;
-    fn coords(&self) -> &Vec<Array1<u64>>;
+    fn coords(&self) -> &Array2<usize>;
 
     // orthogonal indexing
     // fn oindex<I>(&self, indexers: I) -> Result<Self, IndexError>
