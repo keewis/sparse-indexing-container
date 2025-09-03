@@ -1,6 +1,5 @@
 use crate::container::SparseContainer;
-use crate::errors::IndexError;
-use ndarray::{Array1, Array2, IxDyn, SliceArg, SliceInfoElem, Zip};
+use ndarray::{Array1, Array2};
 
 #[derive(Debug)]
 struct COO<T> {
@@ -31,12 +30,11 @@ impl<T> SparseContainer<T> for COO<T> {
     fn fill_value(&self) -> &T {
         &self.fill_value
     }
-    fn data(&self) -> &Array1<T> {
-        &self.data
-    }
+    fn decompose(self) -> (Vec<usize>, T, Array1<T>, Vec<Array1<usize>>) {
+        let coords = self.coords.columns().into_iter().map(|c| c.into_owned()).collect::<Vec<_>>();
 
-    fn coords(&self) -> &Array2<usize> {
-        &self.coords
+        (self.shape, self.fill_value, self.data, coords)
+    }
     }
 
     // fn oindex<I>(&self, indexers: I) -> Result<Self, IndexError>
