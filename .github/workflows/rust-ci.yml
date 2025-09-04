@@ -118,6 +118,18 @@ jobs:
         with:
           prefix-key: "linter"
 
+      - name: Help finding installed libraries
+        run: |
+          pushd $CONDA_PREFIX
+          echo "PKG_CONFIG_PATH=$(readlink -f lib/pkgconfig)" >> $GITHUB_ENV
+          echo "LD_LIBRARY_PATH=$(readlink -f lib)" >> $GITHUB_ENV
+          popd
+
+          if [[ -z "$CONDA_PREFIX" ]]; then
+            echo "CONDA_PREFIX is unset!"
+            exit 1
+          fi
+
       - name: Cargo clippy
         run: |
           cargo clippy --all-targets --all-features
