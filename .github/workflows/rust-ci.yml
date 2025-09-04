@@ -74,11 +74,17 @@ jobs:
         with:
           prefix-key: "${{ matrix.env }}"
 
-      - name: Help the linker on macos
-        if: runner.os == 'MacOS'
+      - name: Help finding installed libraries
         run: |
-          mkdir -p target/debug/deps
-          ln -s $CONDA_PREFIX/lib/*.dylib target/debug/deps/
+          pushd $CONDA_PREFIX
+          echo "PKG_CONFIG_PATH=$(readlink -f lib/pkgconfig)" >> $GITHUB_ENV
+          echo "LD_LIBRARY_PATH=$(readlink -f lib)" >> $GITHUB_ENV
+          popd
+
+          if [[ -z "$CONDA_PREFIX" ]]; then
+            echo "CONDA_PREFIX is unset!"
+            exit 1
+          fi
 
       - name: Run tests
         run: |
