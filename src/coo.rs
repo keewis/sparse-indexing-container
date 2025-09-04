@@ -247,6 +247,21 @@ mod test {
 
         assert_eq!(obj.data, data);
         assert_eq!(obj.coords, coords);
+
+        let data2: Array1<bool> = array![false, true, false];
+        let fill_value2 = false;
+        let obj2 = COO::new(
+            shape.clone(),
+            data2.clone(),
+            coords.clone(),
+            fill_value2.clone(),
+        );
+
+        assert_eq!(obj2.shape, shape);
+        assert_eq!(obj2.fill_value, fill_value2);
+
+        assert_eq!(obj2.data, data2);
+        assert_eq!(obj2.coords, coords);
     }
 
     #[test]
