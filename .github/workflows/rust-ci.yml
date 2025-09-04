@@ -76,7 +76,7 @@ jobs:
 
       - name: Help finding installed libraries
         run: |
-          env
+          export CONDA_PREFIX=$(pixi run python -c 'import os; print(os.environ["CONDA_PREFIX"])')
 
           pushd $CONDA_PREFIX
           echo "PKG_CONFIG_PATH=$(readlink -f lib/pkgconfig)" >> $GITHUB_ENV
