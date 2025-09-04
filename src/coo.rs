@@ -206,11 +206,11 @@ mod test {
         )
     }
 
-    fn create_coo_3d_f64() -> COO<f64> {
+    fn create_coo_3d_i32() -> COO<i32> {
         let shape: Vec<usize> = vec![10, 10, 15];
-        let data: Array1<f64> = array![1.3, 4.7, 2.6, 1.2];
+        let data: Array1<i32> = array![1, -1, 50, 2000];
         let coords: Array2<usize> = array![[2, 4, 2], [7, 0, 14], [4, 9, 5], [9, 2, 8]];
-        let fill_value: f64 = 0.0;
+        let fill_value: i32 = 0;
 
         COO::new(
             shape,
@@ -273,7 +273,7 @@ mod test {
 
     #[test]
     fn test_ndim_3d() {
-        let obj = create_coo_3d_f64();
+        let obj = create_coo_3d_i32();
 
         assert_eq!(obj.ndim(), 3);
     }
