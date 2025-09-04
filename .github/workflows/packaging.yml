@@ -5,13 +5,10 @@
 #
 name: CI
 
-on:
-  push:
-    branches:
-      - main
-    tags:
-      - "*"
-  workflow_dispatch:
+on: {}
+  # push:
+  #   tags:
+  #     - "*"
 
 permissions:
   contents: read
