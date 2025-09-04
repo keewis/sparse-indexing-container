@@ -98,15 +98,10 @@ impl<T: Copy + Send + Sync + std::fmt::Debug> SparseContainer<T> for COO<T> {
             .map(|(slice, size)| slice_size(slice, size))
             .collect::<Vec<_>>();
 
-        let coords2d: Array2<usize> = Array1::from(
-            self.coords
-                .iter()
-                .flatten()
-                .map(|c| c.clone())
-                .collect::<Vec<_>>(),
-        )
-        .into_shape_with_order((self.ndim(), self.data.len()))
-        .unwrap();
+        let coords2d: Array2<usize> =
+            Array1::from(self.coords.iter().flatten().copied().collect::<Vec<_>>())
+                .into_shape_with_order((self.ndim(), self.data.len()))
+                .unwrap();
         let (filtered_data, filtered_coords): (Vec<T>, Vec<Vec<usize>>) = Zip::from(&self.data)
             .and(coords2d.columns())
             .into_par_iter()
@@ -136,7 +131,7 @@ impl<T: Copy + Send + Sync + std::fmt::Debug> SparseContainer<T> for COO<T> {
 
         Self {
             shape: new_shape,
-            fill_value: self.fill_value.clone(),
+            fill_value: self.fill_value,
             data: sliced_data,
             coords: sliced_coords
                 .columns()
@@ -201,12 +196,7 @@ mod test {
             .collect::<Vec<_>>();
         let fill_value: f64 = 0.0;
 
-        let obj = COO::new(
-            shape.clone(),
-            data.clone(),
-            coords.clone(),
-            fill_value.clone(),
-        );
+        let obj = COO::new(shape.clone(), data.clone(), coords.clone(), fill_value);
 
         assert_eq!(obj.shape, shape);
         assert_eq!(obj.fill_value, fill_value);
@@ -216,12 +206,7 @@ mod test {
 
         let data2: Array1<bool> = array![false, true, false];
         let fill_value2 = false;
-        let obj2 = COO::new(
-            shape.clone(),
-            data2.clone(),
-            coords.clone(),
-            fill_value2.clone(),
-        );
+        let obj2 = COO::new(shape.clone(), data2.clone(), coords.clone(), fill_value2);
 
         assert_eq!(obj2.shape, shape);
         assert_eq!(obj2.fill_value, fill_value2);
