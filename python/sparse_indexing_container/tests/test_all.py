@@ -1,4 +1,3 @@
-import pytest
 import sparse_indexing_container
 
 
