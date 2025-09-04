@@ -310,4 +310,19 @@ mod test {
 
         assert_eq!(actual, expected);
     }
+
+    #[test]
+    fn test_oindex_3d_some() {
+        let obj = create_coo_3d_i32();
+
+        let actual = obj.oindex(s![5..10, 0..5, 5..15]);
+        let expected = COO::<i32>::new(
+            vec![5, 5, 10],
+            array![-1, 2000],
+            vec![array![2, 4], array![0, 2], array![9, 3]],
+            0,
+        );
+
+        assert_eq!(actual, expected);
+    }
 }
