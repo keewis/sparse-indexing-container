@@ -1,6 +1,7 @@
 use crate::container::SparseContainer;
-use ndarray::{Array1, Array2, IxDyn, SliceArg, SliceInfoElem};
-use rayon::{iter::ParallelIterator, prelude::ParallelBridge};
+use ndarray::parallel::prelude::*;
+use ndarray::{Array1, Array2, IxDyn, SliceArg, SliceInfoElem, Zip};
+use rayon::iter::ParallelIterator;
 use std::iter::Iterator;
 use std::ops::Range;
 
@@ -97,14 +98,20 @@ impl<T: Copy + Send + Sync + std::fmt::Debug> SparseContainer<T> for COO<T> {
             .map(|(slice, size)| slice_size(slice, size))
             .collect::<Vec<_>>();
 
-        let (filtered_data, filtered_coords): (Vec<T>, Vec<Vec<usize>>) = self
-            .iter()
-            .par_bridge()
+        let coords2d: Array2<usize> = Array1::from(
+            self.coords
+                .iter()
+                .flatten()
+                .map(|c| c.clone())
+                .collect::<Vec<_>>(),
+        )
+        .into_shape_with_order((self.ndim(), self.data.len()))
+        .unwrap();
+        let (filtered_data, filtered_coords): (Vec<T>, Vec<Vec<usize>>) = Zip::from(&self.data)
+            .and(coords2d.columns())
+            .into_par_iter()
             .filter_map(|(data, coords)| {
-                let matched = slices
-                    .iter()
-                    .zip(coords.iter())
-                    .all(|(s, &c)| s.contains(c));
+                let matched = slices.iter().zip(coords.iter()).all(|(s, c)| s.contains(c));
 
                 if matched {
                     Some((
@@ -140,47 +147,6 @@ impl<T: Copy + Send + Sync + std::fmt::Debug> SparseContainer<T> for COO<T> {
     }
 
     // fn concat(parts: Vec<Container<T>>, axis: u8) -> Result<Container<T>, ConcatError> {}
-}
-
-struct CooIterator<'a, T>
-where
-    T: Copy + Send + Sync,
-{
-    index: usize,
-
-    data: &'a Array1<T>,
-    coords: &'a [Array1<usize>],
-}
-
-impl<'a, T: Copy + Send + Sync> Iterator for CooIterator<'a, T> {
-    type Item = (T, Vec<&'a usize>);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.index >= self.data.len() {
-            None
-        } else {
-            let result = Some((
-                self.data[self.index],
-                self.coords
-                    .iter()
-                    .map(|c| &c[self.index])
-                    .collect::<Vec<_>>(),
-            ));
-            self.index += 1;
-
-            result
-        }
-    }
-}
-
-impl<T: Copy + Send + Sync> COO<T> {
-    fn iter(&self) -> CooIterator<'_, T> {
-        CooIterator::<T> {
-            index: 0,
-            data: &self.data,
-            coords: &self.coords,
-        }
-    }
 }
 
 #[cfg(test)]
