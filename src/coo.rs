@@ -275,4 +275,24 @@ mod test {
 
         assert_eq!(actual, expected);
     }
+
+    #[test]
+    fn test_oindex_2d_none() {
+        let obj = create_coo_2d_f64();
+
+        let actual = obj.oindex(s![10..15, 10..15]);
+        let expected = COO::<f64>::new(vec![0, 0], array![], vec![array![], array![]], 0.0);
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_oindex_2d_empty() {
+        let obj = create_coo_2d_f64();
+
+        let actual = obj.oindex(s![5..5, 5..5]);
+        let expected = COO::<f64>::new(vec![0, 0], array![], vec![array![], array![]], 0.0);
+
+        assert_eq!(actual, expected);
+    }
 }
