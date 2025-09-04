@@ -40,12 +40,10 @@ fn slice_size(slice: &Range<usize>, size: &usize) -> usize {
 }
 
 impl<T: Copy + Send + Sync + std::fmt::Debug> SparseContainer<T> for COO<T> {
-    fn shape(&self) -> &Vec<usize> {
+    fn shape(&self) -> &[usize] {
         &self.shape
     }
-    fn fill_value(&self) -> &T {
-        &self.fill_value
-    }
+
     fn decompose(self) -> (Vec<usize>, T, Array1<T>, Vec<Array1<usize>>) {
         (self.shape, self.fill_value, self.data, self.coords)
     }
