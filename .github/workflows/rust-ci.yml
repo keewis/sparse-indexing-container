@@ -76,6 +76,8 @@ jobs:
 
       - name: Help finding installed libraries
         run: |
+          env
+
           pushd $CONDA_PREFIX
           echo "PKG_CONFIG_PATH=$(readlink -f lib/pkgconfig)" >> $GITHUB_ENV
           echo "LD_LIBRARY_PATH=$(readlink -f lib)" >> $GITHUB_ENV
