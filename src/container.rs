@@ -1,4 +1,5 @@
-use ndarray::{Array1, IxDyn, SliceArg};
+use ndarray::Array1;
+use std::ops::Range;
 
 pub trait SparseContainer<T> {
     fn shape(&self) -> &[usize];
@@ -6,9 +7,8 @@ pub trait SparseContainer<T> {
     fn decompose(self) -> (Vec<usize>, Array1<T>, Vec<Array1<usize>>);
 
     // orthogonal indexing
-    fn oindex<I>(&self, indexers: I) -> Self
+    fn oindex(&self, slices: &[Range<usize>]) -> Self
     where
-        I: SliceArg<IxDyn> + std::fmt::Debug,
         Self: Sized;
 
     // concatenation

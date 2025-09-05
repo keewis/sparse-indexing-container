@@ -2,15 +2,15 @@ use crate::container::SparseContainer;
 use crate::slices::slice_size;
 
 use ndarray::parallel::prelude::*;
-use ndarray::{Array1, Array2, IxDyn, SliceArg, SliceInfoElem, Zip};
+use ndarray::{Array1, Array2, Zip};
 
 use numpy::{
     dtype, PyArray1, PyArrayDescrMethods, PyArrayMethods, PyUntypedArray, PyUntypedArrayMethods,
 };
 
-use pyo3::exceptions::{PyNotImplementedError, PyValueError};
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use pyo3::types::{PyBool, PyComplex, PyFloat, PyInt, PySlice};
+use pyo3::types::PySlice;
 
 use rayon::iter::ParallelIterator;
 
@@ -40,7 +40,7 @@ impl<T: Copy + Send + Sync> Coo<T> {
     }
 }
 
-impl<T: Copy + Send + Sync + std::fmt::Debug> SparseContainer<T> for Coo<T> {
+impl<T: Copy + Send + Sync> SparseContainer<T> for Coo<T> {
     fn shape(&self) -> &[usize] {
         &self.shape
     }
@@ -49,9 +49,8 @@ impl<T: Copy + Send + Sync + std::fmt::Debug> SparseContainer<T> for Coo<T> {
         (self.shape, self.data, self.coords)
     }
 
-    fn oindex<I>(&self, indexers: I) -> Self
+    fn oindex(&self, slices: &[Range<usize>]) -> Self
     where
-        I: SliceArg<IxDyn> + std::fmt::Debug,
         Self: Sized,
     {
         // idea:
@@ -59,39 +58,9 @@ impl<T: Copy + Send + Sync + std::fmt::Debug> SparseContainer<T> for Coo<T> {
         // - zip data and coords
         // - filtermap:
         //   - for each indexer:
-        //     - if range:
         //       - if coords not in range: None
         //       - else: remove range.start
-        //     - else:
-        //       - raise (not implemented, not necessary for zarr)
         // - figure out the new data shape (using range intersections)
-        let slices = indexers
-            .as_ref()
-            .iter()
-            .zip(self.shape.iter())
-            .map(|(indexer, size)| match indexer {
-                SliceInfoElem::Slice { start, end, step } => {
-                    let start_ = if *start < 0 {
-                        panic!("negative start values are not supported")
-                    } else {
-                        *start as usize
-                    };
-
-                    if *step != 1 {
-                        panic!("only step sizes of 1 are supported, got {:?}", step);
-                    }
-
-                    let end_ = end.map_or(*size, |v| v as usize);
-
-                    Range {
-                        start: start_,
-                        end: end_,
-                    }
-                }
-                _ => panic!("unsupported indexer type: {:?}", indexer),
-            })
-            .collect::<Vec<_>>();
-
         let new_shape = slices
             .iter()
             .zip(self.shape.iter())
@@ -344,11 +313,7 @@ impl Container {
     fn oindex(&self, indexers: Vec<(usize, usize)>) -> Self {
         let slices = indexers
             .into_iter()
-            .map(|(start, end)| SliceInfoElem::Slice {
-                start: start as isize,
-                end: Some(end as isize),
-                step: 1,
-            })
+            .map(|(start, end)| Range { start, end })
             .collect::<Vec<_>>();
 
         match self {
@@ -492,7 +457,7 @@ impl PyCoo {
 #[cfg(test)]
 mod test {
     use super::*;
-    use ndarray::{array, s};
+    use ndarray::array;
 
     fn create_coo_2d_f64() -> Coo<f64> {
         let shape: Vec<usize> = vec![10, 10];
@@ -569,8 +534,9 @@ mod test {
     #[test]
     fn test_oindex_2d_some() {
         let obj = create_coo_2d_f64();
+        let slices: Vec<Range<usize>> = vec![0..5usize, 0..5usize];
 
-        let actual = obj.oindex(s![..5, ..5]);
+        let actual = obj.oindex(&slices);
         let expected = Coo::<f64>::new(vec![5, 5], array![1.3], vec![array![2], array![4]]);
 
         assert_eq!(actual, expected);
@@ -579,8 +545,9 @@ mod test {
     #[test]
     fn test_oindex_2d_none() {
         let obj = create_coo_2d_f64();
+        let slices = vec![10..15, 10..15];
 
-        let actual = obj.oindex(s![10..15, 10..15]);
+        let actual = obj.oindex(&slices);
         let expected = Coo::<f64>::new(vec![0, 0], array![], vec![array![], array![]]);
 
         assert_eq!(actual, expected);
@@ -589,8 +556,9 @@ mod test {
     #[test]
     fn test_oindex_2d_empty() {
         let obj = create_coo_2d_f64();
+        let slices = vec![5..5, 5..5];
 
-        let actual = obj.oindex(s![5..5, 5..5]);
+        let actual = obj.oindex(&slices);
         let expected = Coo::<f64>::new(vec![0, 0], array![], vec![array![], array![]]);
 
         assert_eq!(actual, expected);
@@ -599,8 +567,9 @@ mod test {
     #[test]
     fn test_oindex_3d_some() {
         let obj = create_coo_3d_i32();
+        let slices: Vec<Range<usize>> = vec![5..10, 0..5, 5..15];
 
-        let actual = obj.oindex(s![5..10, 0..5, 5..15]);
+        let actual = obj.oindex(&slices);
         let expected = Coo::<i32>::new(
             vec![5, 5, 10],
             array![-1, 2000],
