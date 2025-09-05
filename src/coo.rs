@@ -1,4 +1,5 @@
 use crate::container::SparseContainer;
+use crate::slices::slice_size;
 
 use ndarray::parallel::prelude::*;
 use ndarray::{Array1, Array2, IxDyn, SliceArg, SliceInfoElem, Zip};
@@ -36,16 +37,6 @@ impl<T: Copy + Send + Sync> Coo<T> {
             coords,
             shape,
         }
-    }
-}
-
-fn slice_size(slice: &Range<usize>, size: &usize) -> usize {
-    let size_ = *size;
-
-    if slice.start >= size_ {
-        0
-    } else {
-        slice.end.min(size_).saturating_sub(slice.start)
     }
 }
 
