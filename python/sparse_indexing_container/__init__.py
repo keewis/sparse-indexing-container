@@ -1,6 +1,3 @@
-from .sparse_indexing_container import *
+from sparse_indexing_container.sparse_indexing_container import COO
 
-
-__doc__ = sparse_indexing_container.__doc__
-if hasattr(sparse_indexing_container, "__all__"):
-    __all__ = sparse_indexing_container.__all__
+__all__ = ["COO"]
