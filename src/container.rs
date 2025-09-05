@@ -3,7 +3,7 @@ use ndarray::{Array1, IxDyn, SliceArg};
 pub trait SparseContainer<T> {
     fn shape(&self) -> &[usize];
 
-    fn decompose(self) -> (Vec<usize>, T, Array1<T>, Vec<Array1<usize>>);
+    fn decompose(self) -> (Vec<usize>, Array1<T>, Vec<Array1<usize>>);
 
     // orthogonal indexing
     fn oindex<I>(&self, indexers: I) -> Self
