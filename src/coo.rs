@@ -306,7 +306,7 @@ impl Container {
 }
 
 #[pyclass]
-#[pyo3(name = "COO")]
+#[pyo3(name = "COO", module = "sparse_indexing_container")]
 pub struct PyCoo {
     container: Container,
     fill_value: Py<PyAny>,
