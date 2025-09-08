@@ -57,3 +57,32 @@ def test_repr(shape, dtype, fill_value, nsv):
     assert f"dtype='{dtype}'" in actual
     assert f"nsv={nsv}" in actual
     assert f"fill_value={fill_value}" in actual
+
+
+def test_oindex():
+    data = np.array([True, True, True])
+    coords = [np.array([1, 3, 5], dtype="uint64"), np.array([1, 4, 7], dtype="uint64")]
+    shape = (7, 10)
+    fill_value = False
+
+    coo = COO(data=data, coords=coords, shape=shape, fill_value=fill_value)
+
+    actual = coo.oindex((slice(0, 5), slice(0, 5)))
+    assert actual.shape == (5, 5)
+    assert actual.nsv == 2
+    assert actual.dtype == coo.dtype
+    assert actual.fill_value == coo.fill_value
+
+    np.testing.assert_equal(actual.data, data[:2])
+    np.testing.assert_equal(actual.coords[0], coords[0][:2])
+    np.testing.assert_equal(actual.coords[1], coords[1][:2])
+
+    actual = coo.oindex((slice(3, 7), slice(5, 10)))
+    assert actual.shape == (4, 5)
+    assert actual.nsv == 1
+    assert actual.dtype == coo.dtype
+    assert actual.fill_value == coo.fill_value
+
+    np.testing.assert_equal(actual.data, data[2:])
+    np.testing.assert_equal(actual.coords[0], np.array([2], dtype="uint64"))
+    np.testing.assert_equal(actual.coords[1], np.array([2], dtype="uint64"))
