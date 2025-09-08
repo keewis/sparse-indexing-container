@@ -473,7 +473,7 @@ impl PyCoo {
                 .join(", ")
         );
         format!(
-            "<COO shape={0}, dtype={1}, nsv={2}, fill_value={3}>",
+            "<COO shape={0}, dtype='{1}', nsv={2}, fill_value={3}>",
             shape_repr,
             self.container.dtype(py),
             self.container.nsv(),
