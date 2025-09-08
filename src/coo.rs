@@ -422,6 +422,11 @@ impl PyCoo {
         self.container.dtype(py)
     }
 
+    #[getter]
+    fn fill_value<'py>(&self, py: Python<'py>) -> &Bound<'py, PyAny> {
+        self.fill_value.bind(py)
+    }
+
     /// number of stored values
     ///
     /// Also called, number of non-zero values, this is the number of non-background values.
