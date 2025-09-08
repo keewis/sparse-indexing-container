@@ -5,7 +5,8 @@ use ndarray::parallel::prelude::*;
 use ndarray::{Array1, Array2, Zip};
 
 use numpy::{
-    dtype, PyArray1, PyArrayDescrMethods, PyArrayMethods, PyUntypedArray, PyUntypedArrayMethods,
+    dtype, PyArray1, PyArrayDescr, PyArrayDescrMethods, PyArrayMethods, PyUntypedArray,
+    PyUntypedArrayMethods,
 };
 
 use pyo3::exceptions::PyValueError;
@@ -280,6 +281,24 @@ impl Container {
         container_impl!(self, container => Ok(container.coords.iter().map(|c| PyArray1::<usize>::from_array(py, c)).collect::<Vec<_>>()))
     }
 
+    fn dtype<'py>(&self, py: Python<'py>) -> Bound<'py, PyArrayDescr> {
+        match self {
+            Container::Bool(_) => PyArrayDescr::of::<bool>(py),
+            Container::Int8(_) => PyArrayDescr::of::<i8>(py),
+            Container::Int16(_) => PyArrayDescr::of::<i16>(py),
+            Container::Int32(_) => PyArrayDescr::of::<i32>(py),
+            Container::Int64(_) => PyArrayDescr::of::<i64>(py),
+            Container::UInt8(_) => PyArrayDescr::of::<u8>(py),
+            Container::UInt16(_) => PyArrayDescr::of::<u16>(py),
+            Container::UInt32(_) => PyArrayDescr::of::<u32>(py),
+            Container::UInt64(_) => PyArrayDescr::of::<u64>(py),
+            Container::Float32(_) => PyArrayDescr::of::<f32>(py),
+            Container::Float64(_) => PyArrayDescr::of::<f64>(py),
+            Container::Complex32(_) => PyArrayDescr::of::<num_complex::Complex32>(py),
+            Container::Complex64(_) => PyArrayDescr::of::<num_complex::Complex64>(py),
+        }
+    }
+
     fn oindex(&self, indexers: Vec<(usize, usize)>) -> Self {
         let slices = indexers
             .into_iter()
@@ -400,6 +419,11 @@ impl PyCoo {
     #[getter]
     fn data<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyUntypedArray>> {
         self.container.data(py)
+    }
+
+    #[getter]
+    fn dtype<'py>(&self, py: Python<'py>) -> Bound<'py, PyArrayDescr> {
+        self.container.dtype(py)
     }
 
     #[getter]
