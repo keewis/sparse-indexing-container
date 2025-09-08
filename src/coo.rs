@@ -18,10 +18,6 @@ use rayon::iter::ParallelIterator;
 use std::iter::Iterator;
 use std::ops::Range;
 
-trait CooType<T> {
-    type Item;
-}
-
 #[derive(Debug, PartialEq, Clone)]
 struct Coo<T>
 where
@@ -31,10 +27,6 @@ where
     pub coords: Vec<Array1<usize>>,
 
     pub shape: Vec<usize>,
-}
-
-impl<T: Copy + Send + Sync> CooType<T> for Coo<T> {
-    type Item = T;
 }
 
 impl<T: Copy + Send + Sync> Coo<T> {
