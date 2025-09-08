@@ -418,18 +418,8 @@ impl PyCoo {
     }
 
     #[getter]
-    fn data<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyUntypedArray>> {
-        self.container.data(py)
-    }
-
-    #[getter]
     fn dtype<'py>(&self, py: Python<'py>) -> Bound<'py, PyArrayDescr> {
         self.container.dtype(py)
-    }
-
-    #[getter]
-    fn coords<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyArray1<usize>>>> {
-        self.container.coords(py)
     }
 
     /// number of stored values
@@ -438,6 +428,16 @@ impl PyCoo {
     #[getter]
     fn nsv(&self) -> usize {
         self.container.nsv()
+    }
+
+    #[getter]
+    fn data<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyUntypedArray>> {
+        self.container.data(py)
+    }
+
+    #[getter]
+    fn coords<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyArray1<usize>>>> {
+        self.container.coords(py)
     }
 
     fn oindex<'py>(&self, py: Python<'py>, indexers: Vec<Bound<'py, PySlice>>) -> PyResult<Self> {
