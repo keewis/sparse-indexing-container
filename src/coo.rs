@@ -412,6 +412,11 @@ impl PyCoo {
     }
 
     #[getter]
+    fn ndim<'py>(&self) -> usize {
+        self.container.shape().len()
+    }
+
+    #[getter]
     fn shape<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
         PyTuple::new(py, self.container.shape().iter())
     }
