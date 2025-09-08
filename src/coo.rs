@@ -456,6 +456,25 @@ impl PyCoo {
             fill_value: self.fill_value.clone_ref(py),
         })
     }
+
+    fn __repr__(&self, py: Python<'_>) -> String {
+        let shape_repr = format!(
+            "({0})",
+            self.container
+                .shape()
+                .iter()
+                .map(|s| s.to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+        format!(
+            "<COO shape={0}, dtype={1}, nsv={2}, fill_value={3}>",
+            shape_repr,
+            self.container.dtype(py),
+            self.container.nsv(),
+            self.fill_value
+        )
+    }
 }
 
 #[cfg(test)]
