@@ -10,22 +10,30 @@ use numpy::{
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use pyo3::types::PySlice;
+use pyo3::types::{PySlice, PyTuple};
 
 use rayon::iter::ParallelIterator;
 
 use std::iter::Iterator;
 use std::ops::Range;
 
+trait CooType<T> {
+    type Item;
+}
+
 #[derive(Debug, PartialEq, Clone)]
 struct Coo<T>
 where
     T: Copy + Send + Sync,
 {
-    data: Array1<T>,
-    coords: Vec<Array1<usize>>,
+    pub data: Array1<T>,
+    pub coords: Vec<Array1<usize>>,
 
-    shape: Vec<usize>,
+    pub shape: Vec<usize>,
+}
+
+impl<T: Copy + Send + Sync> CooType<T> for Coo<T> {
+    type Item = T;
 }
 
 impl<T: Copy + Send + Sync> Coo<T> {
@@ -128,6 +136,72 @@ enum Container {
     Complex64(Coo<num_complex::Complex64>),
 }
 
+macro_rules! container_impl {
+    ($value:expr, $pattern:pat => $result:expr) => {
+        match $value {
+            Container::Bool($pattern) => $result,
+            Container::Int8($pattern) => $result,
+            Container::Int16($pattern) => $result,
+            Container::Int32($pattern) => $result,
+            Container::Int64($pattern) => $result,
+            Container::UInt8($pattern) => $result,
+            Container::UInt16($pattern) => $result,
+            Container::UInt32($pattern) => $result,
+            Container::UInt64($pattern) => $result,
+            Container::Float32($pattern) => $result,
+            Container::Float64($pattern) => $result,
+            Container::Complex32($pattern) => $result,
+            Container::Complex64($pattern) => $result,
+        }
+    };
+}
+
+macro_rules! container_impl_method {
+    ($value:expr, $pattern:pat => $result:expr) => {
+        match $value {
+            Container::Bool($pattern) => Container::Bool($result),
+            Container::Int8($pattern) => Container::Int8($result),
+            Container::Int16($pattern) => Container::Int16($result),
+            Container::Int32($pattern) => Container::Int32($result),
+            Container::Int64($pattern) => Container::Int64($result),
+            Container::UInt8($pattern) => Container::UInt8($result),
+            Container::UInt16($pattern) => Container::UInt16($result),
+            Container::UInt32($pattern) => Container::UInt32($result),
+            Container::UInt64($pattern) => Container::UInt64($result),
+            Container::Float32($pattern) => Container::Float32($result),
+            Container::Float64($pattern) => Container::Float64($result),
+            Container::Complex32($pattern) => Container::Complex32($result),
+            Container::Complex64($pattern) => Container::Complex64($result),
+        }
+    };
+}
+
+// macro_rules! replace_type {
+//     ($replacement:ty, $type:ident::<T>::$tail:tt) => {
+//         $type::<$replacement>::$tail
+//     }
+// }
+
+// macro_rules! container_impl_typed {
+//     ($value:expr, $pattern:pat => $expression:expr) => {
+//         match $value {
+//             Container::Bool($pattern) => replace_type!(bool, $expression),
+//             Container::Int8($pattern) => replace_type!(i8, $expression),
+//             Container::Int16($pattern) => replace_type!(i16, $expression),
+//             Container::Int32($pattern) => replace_type!(i32, $expression),
+//             Container::Int64($pattern) => replace_type!(i64, $expression),
+//             Container::UInt8($pattern) => replace_type!(u8, $expression),
+//             Container::UInt16($pattern) => replace_type!(u16, $expression),
+//             Container::UInt32($pattern) => replace_type!(u32, $expression),
+//             Container::UInt64($pattern) => replace_type!(u64, $expression),
+//             Container::Float32($pattern) => replace_type!(f32, $expression),
+//             Container::Float64($pattern) => replace_type!(f64, $expression),
+//             Container::Complex32($pattern) => replace_type!(num_complex::Complex32, $expression),
+//             Container::Complex64($pattern) => replace_type!(num_complex::Complex64, $expression),
+//         }
+//     }
+// }
+
 impl Container {
     pub fn decompose<'py>(
         self,
@@ -137,177 +211,73 @@ impl Container {
         Bound<'py, PyUntypedArray>,
         Vec<Bound<'py, PyArray1<usize>>>,
     ) {
+        container_impl!(self, c => {
+                let (shape, data, coords) = c.decompose();
+                let bound_data = PyArray1::from_owned_array(py, data);
+                let bound_coords = coords
+                    .into_iter()
+                    .map(|arr| PyArray1::from_owned_array(py, arr))
+                    .collect();
+                (
+                    shape,
+                    unsafe { bound_data.cast_into_unchecked() },
+                    bound_coords,
+                )
+        })
+    }
+
+    fn shape(&self) -> &[usize] {
+        container_impl!(self, c => &c.shape)
+    }
+
+    fn data<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyUntypedArray>> {
         match self {
-            Self::Bool(c) => {
-                let (shape, data, coords) = c.decompose();
-                let bound_data = PyArray1::from_owned_array(py, data);
-                let bound_coords = coords
-                    .into_iter()
-                    .map(|arr| PyArray1::from_owned_array(py, arr))
-                    .collect();
-                (
-                    shape,
-                    unsafe { bound_data.cast_into_unchecked() },
-                    bound_coords,
-                )
+            Container::Bool(c) => {
+                Ok(PyArray1::<bool>::from_array(py, &c.data).cast_into::<PyUntypedArray>()?)
             }
-            Self::Int8(c) => {
-                let (shape, data, coords) = c.decompose();
-                let bound_data = PyArray1::from_owned_array(py, data);
-                let bound_coords = coords
-                    .into_iter()
-                    .map(|arr| PyArray1::from_owned_array(py, arr))
-                    .collect();
-                (
-                    shape,
-                    unsafe { bound_data.cast_into_unchecked() },
-                    bound_coords,
-                )
+            Container::Int8(c) => {
+                Ok(PyArray1::<i8>::from_array(py, &c.data).cast_into::<PyUntypedArray>()?)
             }
-            Self::Int16(c) => {
-                let (shape, data, coords) = c.decompose();
-                let bound_data = PyArray1::from_owned_array(py, data);
-                let bound_coords = coords
-                    .into_iter()
-                    .map(|arr| PyArray1::from_owned_array(py, arr))
-                    .collect();
-                (
-                    shape,
-                    unsafe { bound_data.cast_into_unchecked() },
-                    bound_coords,
-                )
+            Container::Int16(c) => {
+                Ok(PyArray1::<i16>::from_array(py, &c.data).cast_into::<PyUntypedArray>()?)
             }
-            Self::Int32(c) => {
-                let (shape, data, coords) = c.decompose();
-                let bound_data = PyArray1::from_owned_array(py, data);
-                let bound_coords = coords
-                    .into_iter()
-                    .map(|arr| PyArray1::from_owned_array(py, arr))
-                    .collect();
-                (
-                    shape,
-                    unsafe { bound_data.cast_into_unchecked() },
-                    bound_coords,
-                )
+            Container::Int32(c) => {
+                Ok(PyArray1::<i32>::from_array(py, &c.data).cast_into::<PyUntypedArray>()?)
             }
-            Self::Int64(c) => {
-                let (shape, data, coords) = c.decompose();
-                let bound_data = PyArray1::from_owned_array(py, data);
-                let bound_coords = coords
-                    .into_iter()
-                    .map(|arr| PyArray1::from_owned_array(py, arr))
-                    .collect();
-                (
-                    shape,
-                    unsafe { bound_data.cast_into_unchecked() },
-                    bound_coords,
-                )
+            Container::Int64(c) => {
+                Ok(PyArray1::<i64>::from_array(py, &c.data).cast_into::<PyUntypedArray>()?)
             }
-            Self::UInt8(c) => {
-                let (shape, data, coords) = c.decompose();
-                let bound_data = PyArray1::from_owned_array(py, data);
-                let bound_coords = coords
-                    .into_iter()
-                    .map(|arr| PyArray1::from_owned_array(py, arr))
-                    .collect();
-                (
-                    shape,
-                    unsafe { bound_data.cast_into_unchecked() },
-                    bound_coords,
-                )
+            Container::UInt8(c) => {
+                Ok(PyArray1::<u8>::from_array(py, &c.data).cast_into::<PyUntypedArray>()?)
             }
-            Self::UInt16(c) => {
-                let (shape, data, coords) = c.decompose();
-                let bound_data = PyArray1::from_owned_array(py, data);
-                let bound_coords = coords
-                    .into_iter()
-                    .map(|arr| PyArray1::from_owned_array(py, arr))
-                    .collect();
-                (
-                    shape,
-                    unsafe { bound_data.cast_into_unchecked() },
-                    bound_coords,
-                )
+            Container::UInt16(c) => {
+                Ok(PyArray1::<u16>::from_array(py, &c.data).cast_into::<PyUntypedArray>()?)
             }
-            Self::UInt32(c) => {
-                let (shape, data, coords) = c.decompose();
-                let bound_data = PyArray1::from_owned_array(py, data);
-                let bound_coords = coords
-                    .into_iter()
-                    .map(|arr| PyArray1::from_owned_array(py, arr))
-                    .collect();
-                (
-                    shape,
-                    unsafe { bound_data.cast_into_unchecked() },
-                    bound_coords,
-                )
+            Container::UInt32(c) => {
+                Ok(PyArray1::<u32>::from_array(py, &c.data).cast_into::<PyUntypedArray>()?)
             }
-            Self::UInt64(c) => {
-                let (shape, data, coords) = c.decompose();
-                let bound_data = PyArray1::from_owned_array(py, data);
-                let bound_coords = coords
-                    .into_iter()
-                    .map(|arr| PyArray1::from_owned_array(py, arr))
-                    .collect();
-                (
-                    shape,
-                    unsafe { bound_data.cast_into_unchecked() },
-                    bound_coords,
-                )
+            Container::UInt64(c) => {
+                Ok(PyArray1::<u64>::from_array(py, &c.data).cast_into::<PyUntypedArray>()?)
             }
-            Self::Float32(c) => {
-                let (shape, data, coords) = c.decompose();
-                let bound_data = PyArray1::from_owned_array(py, data);
-                let bound_coords = coords
-                    .into_iter()
-                    .map(|arr| PyArray1::from_owned_array(py, arr))
-                    .collect();
-                (
-                    shape,
-                    unsafe { bound_data.cast_into_unchecked() },
-                    bound_coords,
-                )
+            Container::Float32(c) => {
+                Ok(PyArray1::<f32>::from_array(py, &c.data).cast_into::<PyUntypedArray>()?)
             }
-            Self::Float64(c) => {
-                let (shape, data, coords) = c.decompose();
-                let bound_data = PyArray1::from_owned_array(py, data);
-                let bound_coords = coords
-                    .into_iter()
-                    .map(|arr| PyArray1::from_owned_array(py, arr))
-                    .collect();
-                (
-                    shape,
-                    unsafe { bound_data.cast_into_unchecked() },
-                    bound_coords,
-                )
+            Container::Float64(c) => {
+                Ok(PyArray1::<f64>::from_array(py, &c.data).cast_into::<PyUntypedArray>()?)
             }
-            Self::Complex32(c) => {
-                let (shape, data, coords) = c.decompose();
-                let bound_data = PyArray1::from_owned_array(py, data);
-                let bound_coords = coords
-                    .into_iter()
-                    .map(|arr| PyArray1::from_owned_array(py, arr))
-                    .collect();
-                (
-                    shape,
-                    unsafe { bound_data.cast_into_unchecked() },
-                    bound_coords,
-                )
+            Container::Complex32(c) => {
+                Ok(PyArray1::<num_complex::Complex32>::from_array(py, &c.data)
+                    .cast_into::<PyUntypedArray>()?)
             }
-            Self::Complex64(c) => {
-                let (shape, data, coords) = c.decompose();
-                let bound_data = PyArray1::from_owned_array(py, data);
-                let bound_coords = coords
-                    .into_iter()
-                    .map(|arr| PyArray1::from_owned_array(py, arr))
-                    .collect();
-                (
-                    shape,
-                    unsafe { bound_data.cast_into_unchecked() },
-                    bound_coords,
-                )
+            Container::Complex64(c) => {
+                Ok(PyArray1::<num_complex::Complex64>::from_array(py, &c.data)
+                    .cast_into::<PyUntypedArray>()?)
             }
         }
+    }
+
+    fn coords<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyArray1<usize>>>> {
+        container_impl!(self, container => Ok(container.coords.iter().map(|c| PyArray1::<usize>::from_array(py, c)).collect::<Vec<_>>()))
     }
 
     fn oindex(&self, indexers: Vec<(usize, usize)>) -> Self {
@@ -316,21 +286,7 @@ impl Container {
             .map(|(start, end)| Range { start, end })
             .collect::<Vec<_>>();
 
-        match self {
-            Self::Bool(c) => Self::Bool(c.oindex(slices.as_slice())),
-            Self::Int8(c) => Self::Int8(c.oindex(slices.as_slice())),
-            Self::Int16(c) => Self::Int16(c.oindex(slices.as_slice())),
-            Self::Int32(c) => Self::Int32(c.oindex(slices.as_slice())),
-            Self::Int64(c) => Self::Int64(c.oindex(slices.as_slice())),
-            Self::UInt8(c) => Self::UInt8(c.oindex(slices.as_slice())),
-            Self::UInt16(c) => Self::UInt16(c.oindex(slices.as_slice())),
-            Self::UInt32(c) => Self::UInt32(c.oindex(slices.as_slice())),
-            Self::UInt64(c) => Self::UInt64(c.oindex(slices.as_slice())),
-            Self::Float32(c) => Self::Float32(c.oindex(slices.as_slice())),
-            Self::Float64(c) => Self::Float64(c.oindex(slices.as_slice())),
-            Self::Complex32(c) => Self::Complex32(c.oindex(slices.as_slice())),
-            Self::Complex64(c) => Self::Complex64(c.oindex(slices.as_slice())),
-        }
+        container_impl_method!(self, c => c.oindex(slices.as_slice()))
     }
 }
 
@@ -434,6 +390,21 @@ impl PyCoo {
             container,
             fill_value: fill_value.unbind(),
         })
+    }
+
+    #[getter]
+    fn shape<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
+        PyTuple::new(py, self.container.shape().iter())
+    }
+
+    #[getter]
+    fn data<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyUntypedArray>> {
+        self.container.data(py)
+    }
+
+    #[getter]
+    fn coords<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyArray1<usize>>>> {
+        self.container.coords(py)
     }
 
     fn oindex<'py>(&self, py: Python<'py>, indexers: Vec<Bound<'py, PySlice>>) -> PyResult<Self> {
