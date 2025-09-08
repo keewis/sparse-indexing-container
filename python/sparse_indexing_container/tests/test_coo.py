@@ -19,5 +19,3 @@ def test_init():
     assert actual.shape == shape
     assert actual.fill_value == fill_value
     assert actual.nsv == data.size
-
-    print(actual)
