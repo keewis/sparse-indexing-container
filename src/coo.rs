@@ -277,6 +277,10 @@ impl Container {
         }
     }
 
+    fn nsv(&self) -> usize {
+        container_impl!(self, c => c.data.len())
+    }
+
     fn coords<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyArray1<usize>>>> {
         container_impl!(self, container => Ok(container.coords.iter().map(|c| PyArray1::<usize>::from_array(py, c)).collect::<Vec<_>>()))
     }
@@ -434,6 +438,14 @@ impl PyCoo {
     #[getter]
     fn coords<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyArray1<usize>>>> {
         self.container.coords(py)
+    }
+
+    /// number of stored values
+    ///
+    /// Also called, number of non-zero values, this is the number of non-background values.
+    #[getter]
+    fn nsv(&self) -> usize {
+        self.container.nsv()
     }
 
     fn oindex<'py>(&self, py: Python<'py>, indexers: Vec<Bound<'py, PySlice>>) -> PyResult<Self> {
