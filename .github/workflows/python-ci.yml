@@ -75,7 +75,7 @@ jobs:
 
       - name: Help finding installed libraries
         run: |
-          export CONDA_PREFIX=$(pixi run 'echo $CONDA_PREFIX')
+          export CONDA_PREFIX=$(pixi run --frozen 'echo $CONDA_PREFIX')
 
           if [[ -z "$CONDA_PREFIX" ]]; then
             echo "CONDA_PREFIX is unset!"
@@ -90,7 +90,7 @@ jobs:
       - name: Help the linker on macos
         if: runner.os == 'MacOS'
         run: |
-          export CONDA_PREFIX=$(pixi run 'echo $CONDA_PREFIX')
+          export CONDA_PREFIX=$(pixi run --frozen 'echo $CONDA_PREFIX')
 
           if [ ! -d target/debug/deps ]; then
               mkdir -p target/debug/deps
@@ -99,12 +99,15 @@ jobs:
 
       - name: Explicitly build and install
         run: |
-          pixi run -e "${{ matrix.env }}" maturin develop --uv
+          pixi run -e "${{ matrix.env }}" --frozen maturin develop --uv
 
       - name: Check imports
         run: |
-          pixi run -e "${{ matrix.env }}" python -c 'import sparse_indexing_container'
+          pixi run \
+              -e "${{ matrix.env }}" \
+              --frozen \
+              python -c 'import sparse_indexing_container'
 
       - name: Run tests
         run: |
-          pixi run -e "${{ matrix.env }}" python -m pytest
+          pixi run -e "${{ matrix.env }}" --frozen python -m pytest
