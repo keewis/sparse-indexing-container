@@ -63,15 +63,15 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: setup environment
-        uses: prefix-dev/setup-pixi@fef5c9568ca6c4ff7707bf840ab0692ba3f08293 # 0.9.0
-        with:
-          environments: "${{ matrix.env }}"
-
       - name: Create rust cache
         uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # 2.8.0
         with:
           prefix-key: "${{ matrix.env }}"
+
+      - name: setup environment
+        uses: prefix-dev/setup-pixi@fef5c9568ca6c4ff7707bf840ab0692ba3f08293 # 0.9.0
+        with:
+          environments: "${{ matrix.env }}"
 
       - name: Help finding installed libraries
         run: |
