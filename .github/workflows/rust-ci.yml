@@ -93,8 +93,10 @@ jobs:
         run: |
           export CONDA_PREFIX=$(pixi run 'echo $CONDA_PREFIX')
 
-          mkdir -p target/debug/deps
-          ln -s $CONDA_PREFIX/lib/*.dylib target/debug/deps/
+          if [ ! -d target/debug/deps ]; then
+              mkdir -p target/debug/deps
+              ln -s $CONDA_PREFIX/lib/*.dylib target/debug/deps/
+          fi
 
       - name: Run tests
         run: |
