@@ -96,10 +96,6 @@ jobs:
           mkdir -p target/debug/deps
           ln -s $CONDA_PREFIX/lib/*.dylib target/debug/deps/
 
-          echo "$CONDA_PREFIX"
-          ls -l $CONDA_PREFIX/lib
-          exit 1
-
       - name: Run tests
         run: |
           pixi run -e "${{ matrix.env }}" cargo build --tests --keep-going

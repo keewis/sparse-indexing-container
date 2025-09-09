@@ -76,7 +76,7 @@ jobs:
 
       - name: Help finding installed libraries
         run: |
-          export CONDA_PREFIX=$(pixi run python -c 'import os; print(os.environ["CONDA_PREFIX"])')
+          export CONDA_PREFIX=$(pixi run 'echo $CONDA_PREFIX')
 
           if [[ -z "$CONDA_PREFIX" ]]; then
             echo "CONDA_PREFIX is unset!"
@@ -91,6 +91,8 @@ jobs:
       - name: Help the linker on macos
         if: runner.os == 'MacOS'
         run: |
+          export CONDA_PREFIX=$(pixi run 'echo $CONDA_PREFIX')
+
           mkdir -p target/debug/deps
           ln -s $CONDA_PREFIX/lib/*.dylib target/debug/deps/
 
