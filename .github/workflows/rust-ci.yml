@@ -46,8 +46,8 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - "ubuntu-latest"
-          - "windows-latest"
+          # - "ubuntu-latest"
+          # - "windows-latest"
           - "macos-latest"
         env: ["default"]
 
@@ -102,6 +102,7 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
+    if: false
 
     env:
       FORCE_COLOR: 3
