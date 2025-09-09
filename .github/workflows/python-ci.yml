@@ -42,7 +42,6 @@ jobs:
     if: |
       needs.detect-ci-trigger.outputs.triggered == 'false'
       && !contains(github.event.pull_request.labels.*.name, 'skip-ci')
-      && false
     env:
       FORCE_COLOR: 3
     defaults:
