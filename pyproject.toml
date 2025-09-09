@@ -49,6 +49,9 @@ python = "3.13.*"
 ipython = "*"
 black = "*"
 
+[tool.pixi.feature.dev.tasks]
+local-tests = "pytest"
+
 [tool.pixi.feature.ci-py311.dependencies]
 python = "3.11.*"
 uv = ">=0.8.15,<0.9"
