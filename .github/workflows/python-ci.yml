@@ -1,13 +1,15 @@
-name: Rust CI
-
+name: python CI
 on:
   push:
-    branches: ["main"]
+    branches:
+      - "main"
   pull_request:
-    branches: ["main"]
+    branches:
+      - "main"
+  workflow_dispatch: # allows triggering manually
 
 concurrency:
-  group: ${{ github.workflow }}.${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions: {}
@@ -16,17 +18,17 @@ jobs:
   detect-ci-trigger:
     name: detect ci trigger
     runs-on: ubuntu-latest
-
     if: |
       github.repository_owner == 'keewis'
       && (github.event_name == 'push' || github.event_name == 'pull_request')
     outputs:
       triggered: ${{ steps.detect-trigger.outputs.trigger-found }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v5
         with:
-          fetch-depth: 2
           persist-credentials: false
+          fetch-depth: 2
 
       - uses: xarray-contrib/ci-trigger@10cd2bfec3484946a4058a421ddf9cfad101e715 # v1.2.1
         id: detect-trigger
@@ -34,33 +36,30 @@ jobs:
           keyword: "[skip-ci]"
 
   test:
-    name: ${{ matrix.os }}
+    name: ${{ matrix.os }} ${{ matrix.env }}
     runs-on: ${{ matrix.os }}
-
     needs: detect-ci-trigger
     if: |
       needs.detect-ci-trigger.outputs.triggered == 'false'
       && !contains(github.event.pull_request.labels.*.name, 'skip-ci')
+    env:
+      FORCE_COLOR: 3
+    defaults:
+      run:
+        shell: bash -l {0}
 
     strategy:
       fail-fast: false
       matrix:
         os:
           - "ubuntu-latest"
-          - "windows-latest"
           - "macos-latest"
-        env: ["default"]
-
-    env:
-      FORCE_COLOR: 3
-
-    defaults:
-      run:
-        shell: bash -l {0}
+          - "windows-latest"
+        env: ["ci-py311", "ci-py313"]
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           persist-credentials: false
 
@@ -76,7 +75,7 @@ jobs:
 
       - name: Help finding installed libraries
         run: |
-          export CONDA_PREFIX=$(pixi run 'echo $CONDA_PREFIX')
+          export CONDA_PREFIX=$(pixi run --frozen 'echo $CONDA_PREFIX')
 
           if [[ -z "$CONDA_PREFIX" ]]; then
             echo "CONDA_PREFIX is unset!"
@@ -91,67 +90,24 @@ jobs:
       - name: Help the linker on macos
         if: runner.os == 'MacOS'
         run: |
-          export CONDA_PREFIX=$(pixi run 'echo $CONDA_PREFIX')
+          export CONDA_PREFIX=$(pixi run --frozen 'echo $CONDA_PREFIX')
 
           if [ ! -d target/debug/deps ]; then
               mkdir -p target/debug/deps
               ln -s $CONDA_PREFIX/lib/*.dylib target/debug/deps/
           fi
+
+      - name: Explicitly build and install
+        run: |
+          pixi run -e "${{ matrix.env }}" --frozen maturin develop --uv
+
+      - name: Check imports
+        run: |
+          pixi run \
+              -e "${{ matrix.env }}" \
+              --frozen \
+              python -c 'import sparse_indexing_container'
 
       - name: Run tests
         run: |
-          pixi run -e "${{ matrix.env }}" cargo build --tests --keep-going
-          pixi run -e "${{ matrix.env }}" cargo test --no-fail-fast
-
-  lint:
-    name: Lint
-    runs-on: ubuntu-latest
-
-    env:
-      FORCE_COLOR: 3
-
-    defaults:
-      run:
-        shell: bash -l {0}
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-
-      - name: Create rust cache
-        uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # 2.8.0
-        with:
-          prefix-key: "linter"
-
-      - name: setup environment
-        uses: prefix-dev/setup-pixi@fef5c9568ca6c4ff7707bf840ab0692ba3f08293 # 0.9.0
-        with:
-          environments: "default"
-
-      - name: Help finding installed libraries
-        run: |
-          export CONDA_PREFIX=$(pixi run python -c 'import os; print(os.environ["CONDA_PREFIX"])')
-
-          if [[ -z "$CONDA_PREFIX" ]]; then
-            echo "CONDA_PREFIX is unset!"
-            exit 1
-          fi
-
-          pushd $CONDA_PREFIX
-          echo "PKG_CONFIG_PATH=$(readlink -f lib/pkgconfig)" >> $GITHUB_ENV
-          echo "LD_LIBRARY_PATH=$(readlink -f lib)" >> $GITHUB_ENV
-          popd
-
-      - name: Help the linker on macos
-        if: runner.os == 'MacOS'
-        run: |
-          if [ ! -d target/debug/deps ]; then
-              mkdir -p target/debug/deps
-              ln -s $CONDA_PREFIX/lib/*.dylib target/debug/deps/
-          fi
-
-      - name: Cargo clippy
-        run: |
-          cargo clippy --all-targets --all-features
+          pixi run -e "${{ matrix.env }}" --frozen python -m pytest

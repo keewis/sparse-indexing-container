@@ -1,57 +1,57 @@
 use crate::container::SparseContainer;
+use crate::slices::slice_size;
+
 use ndarray::parallel::prelude::*;
-use ndarray::{Array1, Array2, IxDyn, SliceArg, SliceInfoElem, Zip};
+use ndarray::{Array1, Array2, Zip};
+
+use numpy::{
+    dtype, PyArray1, PyArrayDescr, PyArrayDescrMethods, PyArrayMethods, PyUntypedArray,
+    PyUntypedArrayMethods,
+};
+
+use pyo3::exceptions::PyValueError;
+use pyo3::prelude::*;
+use pyo3::types::{PySlice, PyTuple};
+
 use rayon::iter::ParallelIterator;
+
 use std::iter::Iterator;
 use std::ops::Range;
 
 #[derive(Debug, PartialEq, Clone)]
-struct COO<T>
+struct Coo<T>
 where
     T: Copy + Send + Sync,
 {
-    data: Array1<T>,
-    coords: Vec<Array1<usize>>,
+    pub data: Array1<T>,
+    pub coords: Vec<Array1<usize>>,
 
-    fill_value: T,
-    shape: Vec<usize>,
+    pub shape: Vec<usize>,
 }
 
-impl<T: Copy + Send + Sync> COO<T> {
-    fn new(shape: Vec<usize>, data: Array1<T>, coords: Vec<Array1<usize>>, fill_value: T) -> Self {
+impl<T: Copy + Send + Sync> Coo<T> {
+    fn new(shape: Vec<usize>, data: Array1<T>, coords: Vec<Array1<usize>>) -> Self {
         // unchecked consistency for increased efficiency
 
-        COO {
+        Coo {
             data,
             coords,
-            fill_value,
             shape,
         }
     }
 }
 
-fn slice_size(slice: &Range<usize>, size: &usize) -> usize {
-    let size_ = *size;
-
-    if slice.start >= size_ {
-        0
-    } else {
-        slice.end.min(size_).saturating_sub(slice.start)
-    }
-}
-
-impl<T: Copy + Send + Sync + std::fmt::Debug> SparseContainer<T> for COO<T> {
+impl<T: Copy + Send + Sync> SparseContainer<T> for Coo<T> {
     fn shape(&self) -> &[usize] {
         &self.shape
     }
 
-    fn decompose(self) -> (Vec<usize>, T, Array1<T>, Vec<Array1<usize>>) {
-        (self.shape, self.fill_value, self.data, self.coords)
+    fn decompose(self) -> (Vec<usize>, Array1<T>, Vec<Array1<usize>>) {
+        (self.shape, self.data, self.coords)
     }
 
-    fn oindex<I>(&self, indexers: I) -> Self
+    fn oindex(&self, slices: &[Range<usize>]) -> Self
     where
-        I: SliceArg<IxDyn> + std::fmt::Debug,
         Self: Sized,
     {
         // idea:
@@ -59,39 +59,9 @@ impl<T: Copy + Send + Sync + std::fmt::Debug> SparseContainer<T> for COO<T> {
         // - zip data and coords
         // - filtermap:
         //   - for each indexer:
-        //     - if range:
         //       - if coords not in range: None
         //       - else: remove range.start
-        //     - else:
-        //       - raise (not implemented, not necessary for zarr)
         // - figure out the new data shape (using range intersections)
-        let slices = indexers
-            .as_ref()
-            .iter()
-            .zip(self.shape.iter())
-            .map(|(indexer, size)| match indexer {
-                SliceInfoElem::Slice { start, end, step } => {
-                    let start_ = if *start < 0 {
-                        panic!("negative start values are not supported")
-                    } else {
-                        *start as usize
-                    };
-
-                    if *step != 1 {
-                        panic!("only step sizes of 1 are supported, got {:?}", step);
-                    }
-
-                    let end_ = end.map_or(*size, |v| v as usize);
-
-                    Range {
-                        start: start_,
-                        end: end_,
-                    }
-                }
-                _ => panic!("unsupported indexer type: {:?}", indexer),
-            })
-            .collect::<Vec<_>>();
-
         let new_shape = slices
             .iter()
             .zip(self.shape.iter())
@@ -131,7 +101,6 @@ impl<T: Copy + Send + Sync + std::fmt::Debug> SparseContainer<T> for COO<T> {
 
         Self {
             shape: new_shape,
-            fill_value: self.fill_value,
             data: sliced_data,
             coords: sliced_coords
                 .columns()
@@ -144,18 +113,386 @@ impl<T: Copy + Send + Sync + std::fmt::Debug> SparseContainer<T> for COO<T> {
     // fn concat(parts: Vec<Container<T>>, axis: u8) -> Result<Container<T>, ConcatError> {}
 }
 
+enum Container {
+    Bool(Coo<bool>),
+    Int8(Coo<i8>),
+    Int16(Coo<i16>),
+    Int32(Coo<i32>),
+    Int64(Coo<i64>),
+    UInt8(Coo<u8>),
+    UInt16(Coo<u16>),
+    UInt32(Coo<u32>),
+    UInt64(Coo<u64>),
+    Float32(Coo<f32>),
+    Float64(Coo<f64>),
+    Complex32(Coo<num_complex::Complex32>),
+    Complex64(Coo<num_complex::Complex64>),
+}
+
+macro_rules! container_impl {
+    ($value:expr, $pattern:pat => $result:expr) => {
+        match $value {
+            Container::Bool($pattern) => $result,
+            Container::Int8($pattern) => $result,
+            Container::Int16($pattern) => $result,
+            Container::Int32($pattern) => $result,
+            Container::Int64($pattern) => $result,
+            Container::UInt8($pattern) => $result,
+            Container::UInt16($pattern) => $result,
+            Container::UInt32($pattern) => $result,
+            Container::UInt64($pattern) => $result,
+            Container::Float32($pattern) => $result,
+            Container::Float64($pattern) => $result,
+            Container::Complex32($pattern) => $result,
+            Container::Complex64($pattern) => $result,
+        }
+    };
+}
+
+macro_rules! container_impl_method {
+    ($value:expr, $pattern:pat => $result:expr) => {
+        match $value {
+            Container::Bool($pattern) => Container::Bool($result),
+            Container::Int8($pattern) => Container::Int8($result),
+            Container::Int16($pattern) => Container::Int16($result),
+            Container::Int32($pattern) => Container::Int32($result),
+            Container::Int64($pattern) => Container::Int64($result),
+            Container::UInt8($pattern) => Container::UInt8($result),
+            Container::UInt16($pattern) => Container::UInt16($result),
+            Container::UInt32($pattern) => Container::UInt32($result),
+            Container::UInt64($pattern) => Container::UInt64($result),
+            Container::Float32($pattern) => Container::Float32($result),
+            Container::Float64($pattern) => Container::Float64($result),
+            Container::Complex32($pattern) => Container::Complex32($result),
+            Container::Complex64($pattern) => Container::Complex64($result),
+        }
+    };
+}
+
+// macro_rules! replace_type {
+//     ($replacement:ty, $type:ident::<T>::$tail:tt) => {
+//         $type::<$replacement>::$tail
+//     }
+// }
+
+// macro_rules! container_impl_typed {
+//     ($value:expr, $pattern:pat => $expression:expr) => {
+//         match $value {
+//             Container::Bool($pattern) => replace_type!(bool, $expression),
+//             Container::Int8($pattern) => replace_type!(i8, $expression),
+//             Container::Int16($pattern) => replace_type!(i16, $expression),
+//             Container::Int32($pattern) => replace_type!(i32, $expression),
+//             Container::Int64($pattern) => replace_type!(i64, $expression),
+//             Container::UInt8($pattern) => replace_type!(u8, $expression),
+//             Container::UInt16($pattern) => replace_type!(u16, $expression),
+//             Container::UInt32($pattern) => replace_type!(u32, $expression),
+//             Container::UInt64($pattern) => replace_type!(u64, $expression),
+//             Container::Float32($pattern) => replace_type!(f32, $expression),
+//             Container::Float64($pattern) => replace_type!(f64, $expression),
+//             Container::Complex32($pattern) => replace_type!(num_complex::Complex32, $expression),
+//             Container::Complex64($pattern) => replace_type!(num_complex::Complex64, $expression),
+//         }
+//     }
+// }
+
+impl Container {
+    pub fn decompose<'py>(
+        self,
+        py: Python<'py>,
+    ) -> (
+        Vec<usize>,
+        Bound<'py, PyUntypedArray>,
+        Vec<Bound<'py, PyArray1<usize>>>,
+    ) {
+        container_impl!(self, c => {
+                let (shape, data, coords) = c.decompose();
+                let bound_data = PyArray1::from_owned_array(py, data);
+                let bound_coords = coords
+                    .into_iter()
+                    .map(|arr| PyArray1::from_owned_array(py, arr))
+                    .collect();
+                (
+                    shape,
+                    unsafe { bound_data.cast_into_unchecked() },
+                    bound_coords,
+                )
+        })
+    }
+
+    fn shape(&self) -> &[usize] {
+        container_impl!(self, c => &c.shape)
+    }
+
+    fn data<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyUntypedArray>> {
+        match self {
+            Container::Bool(c) => {
+                Ok(PyArray1::<bool>::from_array(py, &c.data).cast_into::<PyUntypedArray>()?)
+            }
+            Container::Int8(c) => {
+                Ok(PyArray1::<i8>::from_array(py, &c.data).cast_into::<PyUntypedArray>()?)
+            }
+            Container::Int16(c) => {
+                Ok(PyArray1::<i16>::from_array(py, &c.data).cast_into::<PyUntypedArray>()?)
+            }
+            Container::Int32(c) => {
+                Ok(PyArray1::<i32>::from_array(py, &c.data).cast_into::<PyUntypedArray>()?)
+            }
+            Container::Int64(c) => {
+                Ok(PyArray1::<i64>::from_array(py, &c.data).cast_into::<PyUntypedArray>()?)
+            }
+            Container::UInt8(c) => {
+                Ok(PyArray1::<u8>::from_array(py, &c.data).cast_into::<PyUntypedArray>()?)
+            }
+            Container::UInt16(c) => {
+                Ok(PyArray1::<u16>::from_array(py, &c.data).cast_into::<PyUntypedArray>()?)
+            }
+            Container::UInt32(c) => {
+                Ok(PyArray1::<u32>::from_array(py, &c.data).cast_into::<PyUntypedArray>()?)
+            }
+            Container::UInt64(c) => {
+                Ok(PyArray1::<u64>::from_array(py, &c.data).cast_into::<PyUntypedArray>()?)
+            }
+            Container::Float32(c) => {
+                Ok(PyArray1::<f32>::from_array(py, &c.data).cast_into::<PyUntypedArray>()?)
+            }
+            Container::Float64(c) => {
+                Ok(PyArray1::<f64>::from_array(py, &c.data).cast_into::<PyUntypedArray>()?)
+            }
+            Container::Complex32(c) => {
+                Ok(PyArray1::<num_complex::Complex32>::from_array(py, &c.data)
+                    .cast_into::<PyUntypedArray>()?)
+            }
+            Container::Complex64(c) => {
+                Ok(PyArray1::<num_complex::Complex64>::from_array(py, &c.data)
+                    .cast_into::<PyUntypedArray>()?)
+            }
+        }
+    }
+
+    fn nsv(&self) -> usize {
+        container_impl!(self, c => c.data.len())
+    }
+
+    fn coords<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyArray1<usize>>>> {
+        container_impl!(self, container => Ok(container.coords.iter().map(|c| PyArray1::<usize>::from_array(py, c)).collect::<Vec<_>>()))
+    }
+
+    fn dtype<'py>(&self, py: Python<'py>) -> Bound<'py, PyArrayDescr> {
+        match self {
+            Container::Bool(_) => PyArrayDescr::of::<bool>(py),
+            Container::Int8(_) => PyArrayDescr::of::<i8>(py),
+            Container::Int16(_) => PyArrayDescr::of::<i16>(py),
+            Container::Int32(_) => PyArrayDescr::of::<i32>(py),
+            Container::Int64(_) => PyArrayDescr::of::<i64>(py),
+            Container::UInt8(_) => PyArrayDescr::of::<u8>(py),
+            Container::UInt16(_) => PyArrayDescr::of::<u16>(py),
+            Container::UInt32(_) => PyArrayDescr::of::<u32>(py),
+            Container::UInt64(_) => PyArrayDescr::of::<u64>(py),
+            Container::Float32(_) => PyArrayDescr::of::<f32>(py),
+            Container::Float64(_) => PyArrayDescr::of::<f64>(py),
+            Container::Complex32(_) => PyArrayDescr::of::<num_complex::Complex32>(py),
+            Container::Complex64(_) => PyArrayDescr::of::<num_complex::Complex64>(py),
+        }
+    }
+
+    fn oindex(&self, indexers: Vec<(usize, usize)>) -> Self {
+        let slices = indexers
+            .into_iter()
+            .map(|(start, end)| Range { start, end })
+            .collect::<Vec<_>>();
+
+        container_impl_method!(self, c => c.oindex(slices.as_slice()))
+    }
+}
+
+#[pyclass]
+#[pyo3(name = "COO", module = "sparse_indexing_container")]
+pub struct PyCoo {
+    container: Container,
+    fill_value: Py<PyAny>,
+}
+
+#[pymethods]
+impl PyCoo {
+    #[new]
+    fn new<'py>(
+        py: Python<'py>,
+        data: Bound<'py, PyUntypedArray>,
+        coords: Vec<Bound<'py, PyArray1<usize>>>,
+        shape: Vec<usize>,
+        fill_value: Bound<'py, PyAny>,
+    ) -> PyResult<Self> {
+        let element_type = data.dtype();
+        let coords_: Vec<Array1<usize>> = coords
+            .into_iter()
+            .map(|c| unsafe { c.as_array() }.into_owned())
+            .collect();
+
+        let container = if element_type.is_equiv_to(&dtype::<bool>(py)) {
+            let cast_data = data.cast_into::<PyArray1<bool>>()?;
+            let array = unsafe { cast_data.as_array() }.into_owned();
+
+            Ok(Container::Bool(Coo::<bool>::new(shape, array, coords_)))
+        } else if element_type.is_equiv_to(&dtype::<i8>(py)) {
+            let cast_data = data.cast_into::<PyArray1<i8>>()?;
+            let array = unsafe { cast_data.as_array() }.into_owned();
+
+            Ok(Container::Int8(Coo::<i8>::new(shape, array, coords_)))
+        } else if element_type.is_equiv_to(&dtype::<i16>(py)) {
+            let cast_data = data.cast_into::<PyArray1<i16>>()?;
+            let array = unsafe { cast_data.as_array() }.into_owned();
+
+            Ok(Container::Int16(Coo::<i16>::new(shape, array, coords_)))
+        } else if element_type.is_equiv_to(&dtype::<i32>(py)) {
+            let cast_data = data.cast_into::<PyArray1<i32>>()?;
+            let array = unsafe { cast_data.as_array() }.into_owned();
+
+            Ok(Container::Int32(Coo::<i32>::new(shape, array, coords_)))
+        } else if element_type.is_equiv_to(&dtype::<i64>(py)) {
+            let cast_data = data.cast_into::<PyArray1<i64>>()?;
+            let array = unsafe { cast_data.as_array() }.into_owned();
+
+            Ok(Container::Int64(Coo::<i64>::new(shape, array, coords_)))
+        } else if element_type.is_equiv_to(&dtype::<u8>(py)) {
+            let cast_data = data.cast_into::<PyArray1<u8>>()?;
+            let array = unsafe { cast_data.as_array() }.into_owned();
+
+            Ok(Container::UInt8(Coo::<u8>::new(shape, array, coords_)))
+        } else if element_type.is_equiv_to(&dtype::<u16>(py)) {
+            let cast_data = data.cast_into::<PyArray1<u16>>()?;
+            let array = unsafe { cast_data.as_array() }.into_owned();
+
+            Ok(Container::UInt16(Coo::<u16>::new(shape, array, coords_)))
+        } else if element_type.is_equiv_to(&dtype::<u32>(py)) {
+            let cast_data = data.cast_into::<PyArray1<u32>>()?;
+            let array = unsafe { cast_data.as_array() }.into_owned();
+
+            Ok(Container::UInt32(Coo::<u32>::new(shape, array, coords_)))
+        } else if element_type.is_equiv_to(&dtype::<u64>(py)) {
+            let cast_data = data.cast_into::<PyArray1<u64>>()?;
+            let array = unsafe { cast_data.as_array() }.into_owned();
+
+            Ok(Container::UInt64(Coo::<u64>::new(shape, array, coords_)))
+        } else if element_type.is_equiv_to(&dtype::<f32>(py)) {
+            let cast_data = data.cast_into::<PyArray1<f32>>()?;
+            let array = unsafe { cast_data.as_array() }.into_owned();
+
+            Ok(Container::Float32(Coo::<f32>::new(shape, array, coords_)))
+        } else if element_type.is_equiv_to(&dtype::<f64>(py)) {
+            let cast_data = data.cast_into::<PyArray1<f64>>()?;
+            let array = unsafe { cast_data.as_array() }.into_owned();
+
+            Ok(Container::Float64(Coo::<f64>::new(shape, array, coords_)))
+        } else if element_type.is_equiv_to(&dtype::<num_complex::Complex32>(py)) {
+            let cast_data = data.cast_into::<PyArray1<num_complex::Complex32>>()?;
+            let array = unsafe { cast_data.as_array() }.into_owned();
+
+            Ok(Container::Complex32(Coo::<num_complex::Complex32>::new(
+                shape, array, coords_,
+            )))
+        } else if element_type.is_equiv_to(&dtype::<num_complex::Complex64>(py)) {
+            let cast_data = data.cast_into::<PyArray1<num_complex::Complex64>>()?;
+            let array = unsafe { cast_data.as_array() }.into_owned();
+
+            Ok(Container::Complex64(Coo::<num_complex::Complex64>::new(
+                shape, array, coords_,
+            )))
+        } else {
+            Err(PyValueError::new_err("unknown dtype: {element_type:?}"))
+        }?;
+
+        Ok(Self {
+            container,
+            fill_value: fill_value.unbind(),
+        })
+    }
+
+    #[getter]
+    fn ndim<'py>(&self) -> usize {
+        self.container.shape().len()
+    }
+
+    #[getter]
+    fn shape<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
+        PyTuple::new(py, self.container.shape().iter())
+    }
+
+    #[getter]
+    fn dtype<'py>(&self, py: Python<'py>) -> Bound<'py, PyArrayDescr> {
+        self.container.dtype(py)
+    }
+
+    #[getter]
+    fn fill_value<'py>(&self, py: Python<'py>) -> &Bound<'py, PyAny> {
+        self.fill_value.bind(py)
+    }
+
+    /// number of stored values
+    ///
+    /// Also called, number of non-zero values, this is the number of non-background values.
+    #[getter]
+    fn nsv(&self) -> usize {
+        self.container.nsv()
+    }
+
+    #[getter]
+    fn data<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyUntypedArray>> {
+        self.container.data(py)
+    }
+
+    #[getter]
+    fn coords<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyArray1<usize>>>> {
+        self.container.coords(py)
+    }
+
+    fn oindex<'py>(&self, py: Python<'py>, indexers: Vec<Bound<'py, PySlice>>) -> PyResult<Self> {
+        let converted_indexers: Vec<_> = indexers
+            .into_iter()
+            .map(|s| -> PyResult<(usize, usize)> {
+                Ok((
+                    s.getattr("start")?.extract::<usize>()?,
+                    s.getattr("stop")?.extract::<usize>()?,
+                ))
+            })
+            .collect::<PyResult<Vec<_>>>()?;
+
+        Ok(Self {
+            container: self.container.oindex(converted_indexers),
+            fill_value: self.fill_value.clone_ref(py),
+        })
+    }
+
+    fn __repr__(&self, py: Python<'_>) -> String {
+        let shape_repr = format!(
+            "({0})",
+            self.container
+                .shape()
+                .iter()
+                .map(|s| s.to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+        format!(
+            "<COO shape={0}, dtype='{1}', nsv={2}, fill_value={3}>",
+            shape_repr,
+            self.container.dtype(py),
+            self.container.nsv(),
+            self.fill_value
+        )
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
-    use ndarray::{array, s};
+    use ndarray::array;
 
-    fn create_coo_2d_f64() -> COO<f64> {
+    fn create_coo_2d_f64() -> Coo<f64> {
         let shape: Vec<usize> = vec![10, 10];
         let data: Array1<f64> = array![1.3, 4.7, 2.6];
         let coords: Array2<usize> = array![[2, 4], [7, 0], [4, 9]];
-        let fill_value: f64 = 0.0;
 
-        COO::new(
+        Coo::new(
             shape,
             data,
             coords
@@ -163,17 +500,15 @@ mod test {
                 .into_iter()
                 .map(|c| c.into_owned())
                 .collect::<Vec<_>>(),
-            fill_value,
         )
     }
 
-    fn create_coo_3d_i32() -> COO<i32> {
+    fn create_coo_3d_i32() -> Coo<i32> {
         let shape: Vec<usize> = vec![10, 10, 15];
         let data: Array1<i32> = array![1, -1, 50, 2000];
         let coords: Array2<usize> = array![[2, 4, 2], [7, 0, 14], [4, 9, 5], [9, 2, 8]];
-        let fill_value: i32 = 0;
 
-        COO::new(
+        Coo::new(
             shape,
             data,
             coords
@@ -181,7 +516,6 @@ mod test {
                 .into_iter()
                 .map(|c| c.into_owned())
                 .collect::<Vec<_>>(),
-            fill_value,
         )
     }
 
@@ -194,22 +528,18 @@ mod test {
             .into_iter()
             .map(|c| c.into_owned())
             .collect::<Vec<_>>();
-        let fill_value: f64 = 0.0;
 
-        let obj = COO::new(shape.clone(), data.clone(), coords.clone(), fill_value);
+        let obj = Coo::new(shape.clone(), data.clone(), coords.clone());
 
         assert_eq!(obj.shape, shape);
-        assert_eq!(obj.fill_value, fill_value);
 
         assert_eq!(obj.data, data);
         assert_eq!(obj.coords, coords);
 
         let data2: Array1<bool> = array![false, true, false];
-        let fill_value2 = false;
-        let obj2 = COO::new(shape.clone(), data2.clone(), coords.clone(), fill_value2);
+        let obj2 = Coo::new(shape.clone(), data2.clone(), coords.clone());
 
         assert_eq!(obj2.shape, shape);
-        assert_eq!(obj2.fill_value, fill_value2);
 
         assert_eq!(obj2.data, data2);
         assert_eq!(obj2.coords, coords);
@@ -232,12 +562,10 @@ mod test {
     #[test]
     fn test_oindex_2d_some() {
         let obj = create_coo_2d_f64();
+        let slices: Vec<Range<usize>> = vec![0..5usize, 0..5usize];
 
-        let actual = obj.oindex(s![..5, ..5]);
-        let expected = COO::<f64>::new(vec![5, 5], array![1.3], vec![array![2], array![4]], 0.0);
-
-        // assert!(actual_.is_ok(), "{}", actual_.unwrap_err().to_string());
-        // let actual = actual_.unwrap();
+        let actual = obj.oindex(&slices);
+        let expected = Coo::<f64>::new(vec![5, 5], array![1.3], vec![array![2], array![4]]);
 
         assert_eq!(actual, expected);
     }
@@ -245,9 +573,10 @@ mod test {
     #[test]
     fn test_oindex_2d_none() {
         let obj = create_coo_2d_f64();
+        let slices = vec![10..15, 10..15];
 
-        let actual = obj.oindex(s![10..15, 10..15]);
-        let expected = COO::<f64>::new(vec![0, 0], array![], vec![array![], array![]], 0.0);
+        let actual = obj.oindex(&slices);
+        let expected = Coo::<f64>::new(vec![0, 0], array![], vec![array![], array![]]);
 
         assert_eq!(actual, expected);
     }
@@ -255,9 +584,10 @@ mod test {
     #[test]
     fn test_oindex_2d_empty() {
         let obj = create_coo_2d_f64();
+        let slices = vec![5..5, 5..5];
 
-        let actual = obj.oindex(s![5..5, 5..5]);
-        let expected = COO::<f64>::new(vec![0, 0], array![], vec![array![], array![]], 0.0);
+        let actual = obj.oindex(&slices);
+        let expected = Coo::<f64>::new(vec![0, 0], array![], vec![array![], array![]]);
 
         assert_eq!(actual, expected);
     }
@@ -265,13 +595,13 @@ mod test {
     #[test]
     fn test_oindex_3d_some() {
         let obj = create_coo_3d_i32();
+        let slices: Vec<Range<usize>> = vec![5..10, 0..5, 5..15];
 
-        let actual = obj.oindex(s![5..10, 0..5, 5..15]);
-        let expected = COO::<i32>::new(
+        let actual = obj.oindex(&slices);
+        let expected = Coo::<i32>::new(
             vec![5, 5, 10],
             array![-1, 2000],
             vec![array![2, 4], array![0, 2], array![9, 3]],
-            0,
         );
 
         assert_eq!(actual, expected);

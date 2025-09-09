@@ -25,7 +25,6 @@ platforms = ["linux-64", "osx-arm64", "win-64"]
 [tool.pixi.pypi-dependencies]
 sparse-indexing-container = { path = ".", editable = true }
 
-
 [tool.pixi.dependencies]
 rust = ">=1.89.0"
 maturin = ">=1.9.4"
@@ -43,16 +42,26 @@ tests = "pytest"
 
 [tool.pixi.feature.ci-py313.dependencies]
 python = "3.13.*"
+uv = ">=0.8.15,<0.9"
 
 [tool.pixi.feature.dev.dependencies]
+python = "3.13.*"
 ipython = "*"
 black = "*"
+
+[tool.pixi.feature.dev.tasks]
+local-tests = "pytest"
+
+[tool.pixi.feature.ci-py311.dependencies]
+python = "3.11.*"
+uv = ">=0.8.15,<0.9"
 
 [tool.pixi.environments]
 default = { solve-group = "default" }
 tests = { features = ["tests"], solve-group = "default" }
+ci-py311 = ["tests", "ci-py311"]
 ci-py313 = ["tests", "ci-py313"]
-dev = ["ci-py313", "dev"]
+dev = ["tests", "dev"]
 
 [tool.pixi.tasks]
 rust-fmt = "cargo fmt"
