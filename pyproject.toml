@@ -40,19 +40,9 @@ pytest-cov = "*"
 [tool.pixi.feature.tests.tasks]
 tests = "pytest"
 
-[tool.pixi.feature.ci-py311.dependencies]
-python = "3.11.*"
-uv = ">=0.8.15,<0.9"
-
-[tool.pixi.feature.ci-py311.pypi-options.dependency-overrides]
-sparse-indexing-container = { path = "." }
-
 [tool.pixi.feature.ci-py313.dependencies]
 python = "3.13.*"
 uv = ">=0.8.15,<0.9"
-
-[tool.pixi.feature.ci-py313.pypi-options.dependency-overrides]
-sparse-indexing-container = { path = "." }
 
 [tool.pixi.feature.dev.dependencies]
 python = "3.13.*"
@@ -61,6 +51,10 @@ black = "*"
 
 [tool.pixi.feature.dev.tasks]
 local-tests = "pytest"
+
+[tool.pixi.feature.ci-py311.dependencies]
+python = "3.11.*"
+uv = ">=0.8.15,<0.9"
 
 [tool.pixi.environments]
 default = { solve-group = "default" }
