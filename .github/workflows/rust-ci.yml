@@ -134,6 +134,12 @@ jobs:
           echo "LD_LIBRARY_PATH=$(readlink -f lib)" >> $GITHUB_ENV
           popd
 
+      - name: Help the linker on macos
+        if: runner.os == 'MacOS'
+        run: |
+          mkdir -p target/debug/deps
+          ln -s $CONDA_PREFIX/lib/*.dylib target/debug/deps/
+
       - name: Cargo clippy
         run: |
           cargo clippy --all-targets --all-features
