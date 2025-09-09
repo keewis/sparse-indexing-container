@@ -45,6 +45,7 @@ python = "3.13.*"
 uv = ">=0.8.15,<0.9"
 
 [tool.pixi.feature.dev.dependencies]
+python = "3.13.*"
 ipython = "*"
 black = "*"
 
@@ -57,7 +58,7 @@ default = { solve-group = "default" }
 tests = { features = ["tests"], solve-group = "default" }
 ci-py311 = ["tests", "ci-py311"]
 ci-py313 = ["tests", "ci-py313"]
-dev = ["ci-py313", "dev"]
+dev = ["tests", "dev"]
 
 [tool.pixi.tasks]
 rust-fmt = "cargo fmt"
