@@ -88,6 +88,12 @@ jobs:
           echo "LD_LIBRARY_PATH=$(readlink -f lib)" >> $GITHUB_ENV
           popd
 
+      - name: Help the linker on macos
+        if: runner.os == 'MacOS'
+        run: |
+          mkdir -p target/debug/deps
+          ln -s $CONDA_PREFIX/lib/*.dylib target/debug/deps/
+
       - name: Run tests
         run: |
           pixi run -e "${{ matrix.env }}" cargo build --tests --keep-going
