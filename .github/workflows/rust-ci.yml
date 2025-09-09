@@ -145,8 +145,10 @@ jobs:
       - name: Help the linker on macos
         if: runner.os == 'MacOS'
         run: |
-          mkdir -p target/debug/deps
-          ln -s $CONDA_PREFIX/lib/*.dylib target/debug/deps/
+          if [ ! -d target/debug/deps ]; then
+              mkdir -p target/debug/deps
+              ln -s $CONDA_PREFIX/lib/*.dylib target/debug/deps/
+          fi
 
       - name: Cargo clippy
         run: |
