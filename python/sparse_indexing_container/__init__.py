@@ -26,4 +26,4 @@ def array_equal(a, b):
     return a == b
 
 
-__all__ = ["COO"]
+__all__ = ["COO", "array_equal"]
