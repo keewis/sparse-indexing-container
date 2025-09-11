@@ -86,3 +86,71 @@ def test_oindex():
     np.testing.assert_equal(actual.data, data[2:])
     np.testing.assert_equal(actual.coords[0], np.array([2], dtype="uint64"))
     np.testing.assert_equal(actual.coords[1], np.array([2], dtype="uint64"))
+
+
+@pytest.mark.parametrize(["nsv", "other_nsv"], ((3, 3), (3, 4), (4, 3)))
+@pytest.mark.parametrize("shape", ((4,), (4, 4)))
+@pytest.mark.parametrize("other_shape", ((4,), (4, 4)))
+@pytest.mark.parametrize("dtype", ("float64", "bool"))
+@pytest.mark.parametrize("other_dtype", ("float64", "bool"))
+def test_eq_params(nsv, shape, dtype, other_nsv, other_shape, other_dtype):
+    coords = {
+        3: [np.array([1, 3, 5], dtype="uint64"), np.array([1, 4, 7], dtype="uint64")],
+        4: [
+            np.array([1, 3, 4, 5], dtype="uint64"),
+            np.array([1, 4, 6, 7], dtype="uint64"),
+        ],
+    }
+    data = {
+        (3, "bool"): np.array([True, True, True]),
+        (4, "bool"): np.array([True, True, True, True]),
+        (3, "float64"): np.array([5, 2, 0], dtype="float64"),
+        (4, "float64"): np.array([6, 9, 10, 12], dtype="float64"),
+    }
+    fill_value = {
+        "bool": False,
+        "float64": np.nan,
+    }
+
+    data1 = data[(nsv, dtype)]
+    data2 = data[(other_nsv, other_dtype)]
+
+    coords1 = coords[nsv]
+    coords2 = coords[other_nsv]
+
+    shape1 = shape
+    shape2 = other_shape
+
+    fill_value1 = fill_value[dtype]
+    fill_value2 = fill_value[other_dtype]
+
+    coo1 = COO(data=data1, coords=coords1, shape=shape1, fill_value=fill_value1)
+    coo2 = COO(data=data2, coords=coords2, shape=shape2, fill_value=fill_value2)
+
+    expected = (nsv == other_nsv) and (shape == other_shape) and (dtype == other_dtype)
+
+    assert (coo1 == coo2) == expected
+
+
+@pytest.mark.parametrize("index", range(3))
+@pytest.mark.parametrize("other_index", range(3))
+def test_eq_data(index, other_index):
+    data = [
+        np.linspace(0, 10, 5, dtype="float32"),
+        np.arange(5, dtype="float32"),
+        np.linspace(-1, 1, 5, dtype="float32"),
+    ]
+
+    data1 = data[index]
+    data2 = data[other_index]
+
+    coords = [np.arange(5, dtype="uint64"), np.arange(5, dtype="uint64")]
+    shape = (6, 6)
+    fill_value = 0
+
+    coo1 = COO(data=data1, coords=coords, shape=shape, fill_value=fill_value)
+    coo2 = COO(data=data2, coords=coords, shape=shape, fill_value=fill_value)
+
+    expected = index == other_index
+
+    assert (coo1 == coo2) == expected

@@ -11,7 +11,7 @@ use numpy::{
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use pyo3::types::{PySlice, PyTuple};
+use pyo3::types::{PyAnyMethods, PySlice, PyTuple};
 
 use rayon::iter::ParallelIterator;
 
@@ -312,6 +312,32 @@ pub struct PyCoo {
     fill_value: Py<PyAny>,
 }
 
+fn fill_value_equal<'py>(
+    py: Python<'py>,
+    a: &Bound<'py, PyAny>,
+    b: &Bound<'py, PyAny>,
+) -> PyResult<bool> {
+    let comparison: bool = a.eq(b)?;
+    if comparison {
+        Ok(true)
+    } else {
+        let isnan = py.import("math")?.getattr("isnan")?;
+
+        let isnan_a: bool = isnan.call1((a,))?.extract()?;
+        let isnan_b: bool = isnan.call1((b,))?.extract()?;
+
+        Ok(isnan_a && isnan_b)
+    }
+}
+
+fn coo_equal<T: Copy + Send + Sync + PartialEq>(a: &Coo<T>, b: &Coo<T>) -> bool {
+    if a.shape != b.shape || a.data.len() != b.data.len() {
+        false
+    } else {
+        a == b
+    }
+}
+
 #[pymethods]
 impl PyCoo {
     #[new]
@@ -460,6 +486,29 @@ impl PyCoo {
             container: self.container.oindex(converted_indexers),
             fill_value: self.fill_value.clone_ref(py),
         })
+    }
+
+    fn __eq__(&self, py: Python<'_>, other: &Self) -> PyResult<bool> {
+        if !fill_value_equal(py, self.fill_value.bind(py), other.fill_value.bind(py))? {
+            Ok(false)
+        } else {
+            Ok(match (&self.container, &other.container) {
+                (Container::Bool(a), Container::Bool(b)) => coo_equal(a, b),
+                (Container::Int8(a), Container::Int8(b)) => coo_equal(a, b),
+                (Container::Int16(a), Container::Int16(b)) => coo_equal(a, b),
+                (Container::Int32(a), Container::Int32(b)) => coo_equal(a, b),
+                (Container::Int64(a), Container::Int64(b)) => coo_equal(a, b),
+                (Container::UInt8(a), Container::UInt8(b)) => coo_equal(a, b),
+                (Container::UInt16(a), Container::UInt16(b)) => coo_equal(a, b),
+                (Container::UInt32(a), Container::UInt32(b)) => coo_equal(a, b),
+                (Container::UInt64(a), Container::UInt64(b)) => coo_equal(a, b),
+                (Container::Float32(a), Container::Float32(b)) => coo_equal(a, b),
+                (Container::Float64(a), Container::Float64(b)) => coo_equal(a, b),
+                (Container::Complex32(a), Container::Complex32(b)) => coo_equal(a, b),
+                (Container::Complex64(a), Container::Complex64(b)) => coo_equal(a, b),
+                _ => false,
+            })
+        }
     }
 
     fn __repr__(&self, py: Python<'_>) -> String {
