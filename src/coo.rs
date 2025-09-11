@@ -312,6 +312,24 @@ pub struct PyCoo {
     fill_value: Py<PyAny>,
 }
 
+fn fill_value_equal<'py>(
+    py: Python<'py>,
+    a: &Bound<'py, PyAny>,
+    b: &Bound<'py, PyAny>,
+) -> PyResult<bool> {
+    let comparison: bool = a.eq(b)?;
+    if comparison {
+        Ok(true)
+    } else {
+        let isnan = py.import("math")?.getattr("isnan")?;
+
+        let isnan_a: bool = isnan.call1((a,))?.extract()?;
+        let isnan_b: bool = isnan.call1((b,))?.extract()?;
+
+        Ok(isnan_a && isnan_b)
+    }
+}
+
 #[pymethods]
 impl PyCoo {
     #[new]
@@ -463,8 +481,10 @@ impl PyCoo {
     }
 
     fn __eq__(&self, py: Python<'_>, other: &Self) -> PyResult<bool> {
-        Ok(self.fill_value.bind(py).eq(other.fill_value.bind(py))?
-            && match (&self.container, &other.container) {
+        if !fill_value_equal(py, self.fill_value.bind(py), other.fill_value.bind(py))? {
+            Ok(false)
+        } else {
+            Ok(match (&self.container, &other.container) {
                 (Container::Bool(a), Container::Bool(b)) => a == b,
                 (Container::Int8(a), Container::Int8(b)) => a == b,
                 (Container::Int16(a), Container::Int16(b)) => a == b,
@@ -480,6 +500,7 @@ impl PyCoo {
                 (Container::Complex64(a), Container::Complex64(b)) => a == b,
                 _ => false,
             })
+        }
     }
 
     fn __repr__(&self, py: Python<'_>) -> String {
