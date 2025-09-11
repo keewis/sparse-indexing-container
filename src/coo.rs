@@ -330,6 +330,14 @@ fn fill_value_equal<'py>(
     }
 }
 
+fn coo_equal<T: Copy + Send + Sync + PartialEq>(a: &Coo<T>, b: &Coo<T>) -> bool {
+    if a.shape != b.shape || a.data.len() != b.data.len() {
+        false
+    } else {
+        a == b
+    }
+}
+
 #[pymethods]
 impl PyCoo {
     #[new]
@@ -485,19 +493,19 @@ impl PyCoo {
             Ok(false)
         } else {
             Ok(match (&self.container, &other.container) {
-                (Container::Bool(a), Container::Bool(b)) => a == b,
-                (Container::Int8(a), Container::Int8(b)) => a == b,
-                (Container::Int16(a), Container::Int16(b)) => a == b,
-                (Container::Int32(a), Container::Int32(b)) => a == b,
-                (Container::Int64(a), Container::Int64(b)) => a == b,
-                (Container::UInt8(a), Container::UInt8(b)) => a == b,
-                (Container::UInt16(a), Container::UInt16(b)) => a == b,
-                (Container::UInt32(a), Container::UInt32(b)) => a == b,
-                (Container::UInt64(a), Container::UInt64(b)) => a == b,
-                (Container::Float32(a), Container::Float32(b)) => a == b,
-                (Container::Float64(a), Container::Float64(b)) => a == b,
-                (Container::Complex32(a), Container::Complex32(b)) => a == b,
-                (Container::Complex64(a), Container::Complex64(b)) => a == b,
+                (Container::Bool(a), Container::Bool(b)) => coo_equal(a, b),
+                (Container::Int8(a), Container::Int8(b)) => coo_equal(a, b),
+                (Container::Int16(a), Container::Int16(b)) => coo_equal(a, b),
+                (Container::Int32(a), Container::Int32(b)) => coo_equal(a, b),
+                (Container::Int64(a), Container::Int64(b)) => coo_equal(a, b),
+                (Container::UInt8(a), Container::UInt8(b)) => coo_equal(a, b),
+                (Container::UInt16(a), Container::UInt16(b)) => coo_equal(a, b),
+                (Container::UInt32(a), Container::UInt32(b)) => coo_equal(a, b),
+                (Container::UInt64(a), Container::UInt64(b)) => coo_equal(a, b),
+                (Container::Float32(a), Container::Float32(b)) => coo_equal(a, b),
+                (Container::Float64(a), Container::Float64(b)) => coo_equal(a, b),
+                (Container::Complex32(a), Container::Complex32(b)) => coo_equal(a, b),
+                (Container::Complex64(a), Container::Complex64(b)) => coo_equal(a, b),
                 _ => false,
             })
         }
