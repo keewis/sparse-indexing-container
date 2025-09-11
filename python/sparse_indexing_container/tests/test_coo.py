@@ -130,3 +130,27 @@ def test_eq_params(nsv, shape, dtype, other_nsv, other_shape, other_dtype):
     expected = (nsv == other_nsv) and (shape == other_shape) and (dtype == other_dtype)
 
     assert (coo1 == coo2) == expected
+
+
+@pytest.mark.parametrize("index", range(3))
+@pytest.mark.parametrize("other_index", range(3))
+def test_eq_data(index, other_index):
+    data = [
+        np.linspace(0, 10, 5, dtype="float32"),
+        np.arange(5, dtype="float32"),
+        np.linspace(-1, 1, 5, dtype="float32"),
+    ]
+
+    data1 = data[index]
+    data2 = data[other_index]
+
+    coords = [np.arange(5, dtype="uint64"), np.arange(5, dtype="uint64")]
+    shape = (6, 6)
+    fill_value = 0
+
+    coo1 = COO(data=data1, coords=coords, shape=shape, fill_value=fill_value)
+    coo2 = COO(data=data2, coords=coords, shape=shape, fill_value=fill_value)
+
+    expected = index == other_index
+
+    assert (coo1 == coo2) == expected
