@@ -11,7 +11,7 @@ use numpy::{
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use pyo3::types::{PySlice, PyTuple};
+use pyo3::types::{PyAnyMethods, PySlice, PyTuple};
 
 use rayon::iter::ParallelIterator;
 
@@ -460,6 +460,26 @@ impl PyCoo {
             container: self.container.oindex(converted_indexers),
             fill_value: self.fill_value.clone_ref(py),
         })
+    }
+
+    fn __eq__(&self, py: Python<'_>, other: &Self) -> PyResult<bool> {
+        Ok(self.fill_value.bind(py).eq(other.fill_value.bind(py))?
+            && match (&self.container, &other.container) {
+                (Container::Bool(a), Container::Bool(b)) => a == b,
+                (Container::Int8(a), Container::Int8(b)) => a == b,
+                (Container::Int16(a), Container::Int16(b)) => a == b,
+                (Container::Int32(a), Container::Int32(b)) => a == b,
+                (Container::Int64(a), Container::Int64(b)) => a == b,
+                (Container::UInt8(a), Container::UInt8(b)) => a == b,
+                (Container::UInt16(a), Container::UInt16(b)) => a == b,
+                (Container::UInt32(a), Container::UInt32(b)) => a == b,
+                (Container::UInt64(a), Container::UInt64(b)) => a == b,
+                (Container::Float32(a), Container::Float32(b)) => a == b,
+                (Container::Float64(a), Container::Float64(b)) => a == b,
+                (Container::Complex32(a), Container::Complex32(b)) => a == b,
+                (Container::Complex64(a), Container::Complex64(b)) => a == b,
+                _ => false,
+            })
     }
 
     fn __repr__(&self, py: Python<'_>) -> String {
